@@ -35,7 +35,7 @@ jobs:
             - name: Prepare deployment
               run: |
                   mkdir _site
-                  cp index.html style.css favicon.png _site/
+                  cp index.html style.css favicon.png normal.jpg _site/
                   cp -r dist src _site/
             - name: Upload artifact
               uses: actions/upload-pages-artifact@v4
