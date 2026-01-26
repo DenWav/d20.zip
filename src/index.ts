@@ -673,6 +673,7 @@ scene.add(floorMesh);
 const floorBody = new CANNON.Body({
     mass: 0,
     shape: new CANNON.Plane(),
+    material: world.floorMaterial,
     collisionFilterGroup: COLLISION_GROUP_GROUND,
     collisionFilterMask: COLLISION_GROUP_DICE,
 });
@@ -733,6 +734,7 @@ for (let i = 0; i < wallCount; i++) {
         shape: new CANNON.Box(
             new CANNON.Vec3(wallSideLength / 2 + 1.0, physicsWallHeight / 2, physicsWallThickness / 2)
         ),
+        material: world.wallMaterial,
         collisionFilterGroup: COLLISION_GROUP_WALLS,
         collisionFilterMask: COLLISION_GROUP_DICE,
     });
@@ -1041,13 +1043,37 @@ function createDice(
         linearDamping: 0.2,
         angularDamping: 0.2,
         allowSleep: true,
-        sleepSpeedLimit: 1,
-        sleepTimeLimit: 0.4,
+        sleepSpeedLimit: 0.8,
+        sleepTimeLimit: 0.5,
+        material: world.diceMaterial,
         collisionFilterGroup: COLLISION_GROUP_DICE,
         collisionFilterMask: COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND,
     });
 
     body.addShape(shape);
+
+    body.addEventListener('collide', (event: any) => {
+        if (event.body.material === world.wallMaterial) {
+            const contact = event.contact;
+            // contact.ni is the normal vector pointing from body b to body a.
+            // We want the impulse to point towards our dice (body).
+            let normal = contact.ni;
+            if (contact.bi !== body) {
+                normal = normal.clone().negate();
+            }
+
+            // Apply an additional "push" away from the wall
+            const pushMagnitude = 100; // mass is 50, so this adds 2m/s
+            const impulse = normal.clone().scale(pushMagnitude);
+            body.applyImpulse(impulse);
+
+            // Add some random angular momentum to help prevent dice from landing cocked
+            const spinMagnitude = 25;
+            body.angularVelocity.x += (Math.random() - 0.5) * spinMagnitude;
+            body.angularVelocity.y += (Math.random() - 0.5) * spinMagnitude;
+            body.angularVelocity.z += (Math.random() - 0.5) * spinMagnitude;
+        }
+    });
 
     let hasEnteredTray: boolean;
     if (initialState) {
