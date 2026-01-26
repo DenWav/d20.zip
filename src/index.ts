@@ -34,8 +34,12 @@ directionalLight.shadow.camera.left = -15;
 directionalLight.shadow.camera.right = 15;
 directionalLight.shadow.camera.top = 15;
 directionalLight.shadow.camera.bottom = -15;
-directionalLight.shadow.mapSize.width = 1024;
-directionalLight.shadow.mapSize.height = 1024;
+directionalLight.shadow.camera.near = 1;
+directionalLight.shadow.camera.far = 50;
+directionalLight.shadow.mapSize.width = 4096;
+directionalLight.shadow.mapSize.height = 4096;
+directionalLight.shadow.radius = 5;
+directionalLight.shadow.bias = -0.0001;
 scene.add(directionalLight);
 
 // Secondary light for more depth
@@ -669,7 +673,6 @@ interface Dice {
     groupIndex: number;
     logicalIndex: number; // for d100, both physical dice share same logicalIndex
     isTens?: boolean;
-    spawnTime: number;
 }
 
 const diceList: Dice[] = [];
@@ -754,6 +757,7 @@ function addToHistory(formula: string, template: string, id: number, groups: Rol
     if (rollHistory.length > maxHistory) {
         rollHistory.pop();
     }
+    pruneDiceList();
     updateHistoryUI();
     saveState();
 }
@@ -842,9 +846,8 @@ function getDiceAsset(type: DiceType, isTens: boolean): CachedDiceAsset {
     if (type === 'd6') {
         shape = new CANNON.Box(new CANNON.Vec3(0.4, 0.4, 0.4));
     } else if (type === 'd2') {
-        // Optimization: Use a simpler cylinder for D2 physics instead of 128 triangles
         // Cannon Cylinder is oriented along Z axis by default
-        shape = new CANNON.Cylinder(0.8, 0.8, 0.15, 16);
+        shape = new CANNON.Cylinder(0.8, 0.8, 0.075, 16);
     } else {
         shape = createConvexPolyhedron(geometry);
     }
@@ -893,11 +896,11 @@ function createDice(
     scene.add(mesh);
 
     const body = new CANNON.Body({
-        mass: 15,
+        mass: 50,
         linearDamping: 0.2,
         angularDamping: 0.2,
         allowSleep: true,
-        sleepSpeedLimit: 0.2,
+        sleepSpeedLimit: 0.3,
         sleepTimeLimit: 0.8,
         collisionFilterGroup: COLLISION_GROUP_DICE,
         collisionFilterMask: COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND,
@@ -970,11 +973,11 @@ function createDice(
         }
         mesh.quaternion.copy(body.quaternion as any);
 
-        // Velocity: towards the center area
+        // Velocity: towards the center area (with enough variation to prevent piling)
         const throwTarget = new THREE.Vector3(
-            (Math.random() - 0.5) * wallLimit * 0.5,
+            (Math.random() - 0.5) * wallLimit * 1.2,
             0,
-            (Math.random() - 0.5) * wallLimit * 0.5
+            (Math.random() - 0.5) * wallLimit * 1.2
         );
 
         // Calculate horizontal direction only
@@ -982,15 +985,17 @@ function createDice(
         horizontalDir.y = 0;
         horizontalDir.normalize();
 
+        // Add some random variation to the throw angle
+        const angleVar = (Math.random() - 0.5) * 0.4; // +/- 0.2 radians
+        horizontalDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), angleVar);
+
         const speed = 15 + Math.random() * 10;
         const velVec = horizontalDir.clone().multiplyScalar(speed);
 
         if (type === 'd2') {
             // Coin flip: significant upward velocity
             velVec.y = 8 + Math.random() * 6;
-            // Slightly less horizontal speed to keep it more centered during the flip
-            velVec.x *= 0.8;
-            velVec.z *= 0.8;
+            // Removed horizontal speed penalty to encourage spreading out
         } else {
             // Slight upward arc for the throw
             velVec.y = 2 + Math.random() * 6;
@@ -1038,7 +1043,6 @@ function createDice(
         groupIndex,
         logicalIndex,
         isTens,
-        spawnTime: initialState ? initialState.spawnTime : Date.now(),
     });
 }
 
@@ -1119,6 +1123,7 @@ function evaluateMath(expr: string): number {
 
 (window as any).clearHistory = () => {
     rollHistory.length = 0;
+    pruneDiceList();
     updateHistoryUI();
     saveState();
 };
@@ -1173,7 +1178,6 @@ function evaluateMath(expr: string): number {
     let diceCounter = 0;
 
     template = template.replace(diceRegex, (match, p1, p2, p3, p4) => {
-        const groupIndex = groupCounter++;
         const count = p1 === '' ? 1 : parseInt(p1);
         const sides = parseInt(p2);
         const keepType = p3 as 'kh' | 'kl' | undefined;
@@ -1191,6 +1195,7 @@ function evaluateMath(expr: string): number {
         else if (sides === 100) type = 'd100';
 
         if (type) {
+            const groupIndex = groupCounter++;
             groups.push({ type, count, keepType, keepCount });
             for (let i = 0; i < count; i++) {
                 if (type === 'd100') {
@@ -1227,6 +1232,18 @@ window.addEventListener('resize', () => {
 
 let lastTime = 0;
 const fixedStep = 1 / 60;
+
+function pruneDiceList() {
+    const historyIds = new Set(rollHistory.map((r) => r.id));
+    for (let i = diceList.length - 1; i >= 0; i--) {
+        const dice = diceList[i];
+        if (!historyIds.has(dice.rollId)) {
+            scene.remove(dice.mesh);
+            world.cannonWorld.removeBody(dice.body);
+            diceList.splice(i, 1);
+        }
+    }
+}
 
 function updateDiceResults() {
     const rollsToUpdate = new Set<number>();
@@ -1325,12 +1342,14 @@ function updateDiceResults() {
 
                 const evalFormula = record.template.replace(/__G(\d+)__/g, (_, idxStr) => {
                     const idx = parseInt(idxStr);
-                    return groupValues[idx].toString();
+                    return groupValues[idx] !== undefined ? groupValues[idx].toString() : '0';
                 });
 
                 record.result = evaluateMath(evalFormula);
                 updateHistoryUI();
                 saveState();
+            } else if (!record) {
+                pruneDiceList();
             }
         }
     }
@@ -1365,7 +1384,6 @@ function saveState() {
             currentValue: d.currentValue,
             isSettled: d.isSettled,
             hasEnteredTray: d.hasEnteredTray,
-            spawnTime: d.spawnTime,
         })),
     };
     localStorage.setItem('d20_state', JSON.stringify(state));
@@ -1407,6 +1425,7 @@ function loadState() {
                 );
             }
         }
+        pruneDiceList();
     } catch (e) {
         console.error('Failed to load state', e);
     }
@@ -1420,7 +1439,6 @@ function animate(time: number = 0) {
     controls.update();
     world.step(fixedStep, Math.min(dt, 0.1));
 
-    const now = Date.now();
     for (const dice of diceList) {
         if (!dice.hasEnteredTray) {
             const distSq = dice.body.position.x * dice.body.position.x + dice.body.position.z * dice.body.position.z;
@@ -1429,30 +1447,6 @@ function animate(time: number = 0) {
                 dice.hasEnteredTray = true;
                 dice.body.collisionFilterMask = COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND | COLLISION_GROUP_WALLS;
             }
-        }
-
-        // Settling assistant: if dice takes too long to settle (e.g. wiggling in a stack), help it out
-        if (!dice.isSettled) {
-            const activeTime = (now - dice.spawnTime) / 1000;
-            if (activeTime > 3.0) {
-                // Gradually increase damping to force settlement
-                const factor = Math.min(1.0, (activeTime - 3.0) / 2.0); // Max effect after 5.0s
-                dice.body.linearDamping = 0.2 + factor * 0.7;
-                dice.body.angularDamping = 0.2 + factor * 0.7;
-
-                // Hard sleep: if moving slowly after a timeout, force sleep
-                if (activeTime > 4.0) {
-                    const linVel = dice.body.velocity.length();
-                    const angVel = dice.body.angularVelocity.length();
-                    if (linVel < 0.3 && angVel < 0.3) {
-                        dice.body.sleep();
-                    }
-                }
-            }
-        } else {
-            // Reset damping when settled
-            dice.body.linearDamping = 0.2;
-            dice.body.angularDamping = 0.2;
         }
 
         dice.mesh.position.copy(dice.body.position as any);

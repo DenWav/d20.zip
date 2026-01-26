@@ -35,7 +35,7 @@ canvas {
     width: 90px;
     height: 40px;
     pointer-events: auto;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
     background-image: none;
     appearance: none;
     -moz-appearance: none;
@@ -62,7 +62,7 @@ button::-moz-focus-inner {
 }
 
 #formula {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
     background-image: none;
     appearance: none;
     -moz-appearance: none;
@@ -129,7 +129,7 @@ button::-moz-focus-inner {
 }
 
 #reset-camera-btn {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
     margin-left: auto;
 }
 
@@ -245,7 +245,7 @@ button::-moz-focus-inner {
 }
 
 .re-roll-btn {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
     background-image: none;
     appearance: none;
     -moz-appearance: none;
@@ -297,7 +297,7 @@ button::-moz-focus-inner {
 }
 
 .sub-btn {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
     background-image: none;
     appearance: none;
     -moz-appearance: none;

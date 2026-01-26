@@ -6,22 +6,22 @@ export class World {
     constructor() {
         this.cannonWorld = new CANNON.World();
         this.cannonWorld.allowSleep = true;
-        this.cannonWorld.gravity.set(0, -38, 0);
+        this.cannonWorld.gravity.set(0, -24, 0);
         this.cannonWorld.broadphase = new CANNON.NaiveBroadphase();
 
         const solver = new CANNON.GSSolver();
-        solver.iterations = 60;
-        solver.tolerance = 0.001;
+        solver.iterations = 240;
+        solver.tolerance = 0.01;
         this.cannonWorld.solver = new CANNON.SplitSolver(solver);
 
         // Default contact material
         const defaultMaterial = new CANNON.Material('default');
         const defaultContactMaterial = new CANNON.ContactMaterial(defaultMaterial, defaultMaterial, {
-            friction: 0.8,
+            friction: 0.9,
             restitution: 0.1,
-            contactEquationStiffness: 1e4,
+            contactEquationStiffness: 1e6,
             contactEquationRelaxation: 10,
-            frictionEquationStiffness: 1e4,
+            frictionEquationStiffness: 1e6,
             frictionEquationRelaxation: 10,
         });
         this.cannonWorld.addContactMaterial(defaultContactMaterial);
