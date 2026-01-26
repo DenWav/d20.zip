@@ -124,8 +124,8 @@ const world = new World();
 // --- Dice Number Texture ---
 function createDiceTexture() {
     const canvas = document.createElement('canvas');
-    // Double resolution for better sharpness
-    canvas.width = 4096;
+    // 2048 is plenty for sharp numbers and saves memory
+    canvas.width = 2048;
     canvas.height = canvas.width * 1.5; // 10 x 15 grid
     const ctx = canvas.getContext('2d')!;
 
@@ -134,12 +134,12 @@ function createDiceTexture() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const gridSize = 10;
-    const cellSize = 4096 / gridSize;
+    const cellSize = canvas.width / gridSize;
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    // Base font size (scaled for 4096 resolution)
-    ctx.font = 'bold 160px Arial';
+    // Base font size (scaled for 2048 resolution)
+    ctx.font = 'bold 80px Arial';
     ctx.fillStyle = '#4c4c4c';
 
     // 1-20
@@ -150,7 +150,7 @@ function createDiceTexture() {
     }
 
     // 00-90 for D100 tens
-    ctx.font = 'bold 170px Arial';
+    ctx.font = 'bold 85px Arial';
     for (let i = 0; i < 10; i++) {
         const x = (i % gridSize) * cellSize + cellSize / 2;
         const y = (10 + Math.floor(i / gridSize)) * cellSize + cellSize / 2;
@@ -158,7 +158,7 @@ function createDiceTexture() {
     }
 
     // 0-9 for D10
-    ctx.font = 'bold 160px Arial';
+    ctx.font = 'bold 80px Arial';
     for (let i = 0; i < 10; i++) {
         const x = (i % gridSize) * cellSize + cellSize / 2;
         const y = (11 + Math.floor(i / gridSize)) * cellSize + cellSize / 2;
@@ -166,7 +166,7 @@ function createDiceTexture() {
     }
 
     // D4 special cells in row 12
-    ctx.font = 'bold 70px Arial';
+    ctx.font = 'bold 35px Arial';
     const d4Faces = [
         [2, 4, 3],
         [1, 3, 4],
@@ -296,6 +296,30 @@ function createFeltTexture() {
 const textureLoader = new THREE.TextureLoader();
 const diceTexture = createDiceTexture();
 const feltTexture = createFeltTexture();
+const normalMapTexture = textureLoader.load('normal.jpg');
+normalMapTexture.wrapS = THREE.RepeatWrapping;
+normalMapTexture.wrapT = THREE.RepeatWrapping;
+normalMapTexture.repeat.set(3, 3);
+
+const diceMaterial = new THREE.MeshPhysicalMaterial({
+    roughness: 0.75,
+    metalness: 0.6,
+    map: diceTexture,
+    bumpMap: normalMapTexture,
+    bumpScale: 0.1,
+    roughnessMap: diceTexture,
+    transmission: 0.4,
+    thickness: 2,
+    ior: 5,
+    transparent: true,
+    opacity: 0.95,
+    normalScale: new THREE.Vector2(0.8),
+    normalMap: normalMapTexture,
+    clearcoatNormalMap: normalMapTexture,
+    clearcoat: 1,
+    clearcoatRoughness: 2,
+    clearcoatNormalScale: new THREE.Vector2(0.2),
+});
 
 // --- UV Mapping and Face Detection ---
 interface FaceInfo {
@@ -612,7 +636,13 @@ world.addBody(floorBody);
 // Visual Walls & Physics Walls
 const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.5 });
 const wallSideLength = 2 * floorRadius * Math.sin(Math.PI / wallCount);
-const wallGeom = new THREE.BoxGeometry(wallSideLength, wallHeight, wallThickness);
+const wallGeom = new THREE.BoxGeometry(wallSideLength, wallHeight + 0.01, wallThickness);
+
+const wallInstancedMesh = new THREE.InstancedMesh(wallGeom, wallMaterial, wallCount);
+wallInstancedMesh.castShadow = true;
+wallInstancedMesh.receiveShadow = true;
+wallInstancedMesh.frustumCulled = false;
+scene.add(wallInstancedMesh);
 
 const physicsWallThickness = 2.0;
 const physicsWallHeight = 150.0; // Much taller physics walls to prevent escape
@@ -622,13 +652,13 @@ for (let i = 0; i < wallCount; i++) {
     const x = Math.cos(angle) * wallLimit;
     const z = Math.sin(angle) * wallLimit;
 
-    // Visual wall
-    const wallMesh = new THREE.Mesh(wallGeom, wallMaterial);
-    wallMesh.position.set(x, wallHeight / 2 - floorThickness, z);
-    wallMesh.rotation.y = Math.PI / 2 - angle;
-    wallMesh.castShadow = true;
-    wallMesh.receiveShadow = true;
-    scene.add(wallMesh);
+    // Visual wall instance
+    const dummy = new THREE.Object3D();
+    // Shifted down and slightly taller to avoid Z-fighting with floor bottom while keeping top level
+    dummy.position.set(x, (wallHeight + 0.01) / 2 - floorThickness - 0.01, z);
+    dummy.rotation.y = Math.PI / 2 - angle;
+    dummy.updateMatrix();
+    wallInstancedMesh.setMatrixAt(i, dummy.matrix);
 
     // Physics wall (Thicker box to prevent clipping)
     // We want the inner face to match the visual wall's inner face.
@@ -647,8 +677,8 @@ for (let i = 0; i < wallCount; i++) {
         collisionFilterMask: COLLISION_GROUP_DICE,
     });
     body.position.set(px, physicsWallHeight / 2 - floorThickness, pz);
-    body.quaternion.copy(wallMesh.quaternion as any);
-    world.addBody(body);
+    body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), Math.PI / 2 - angle);
+    world.cannonWorld.addBody(body);
 }
 
 interface Dice {
@@ -661,9 +691,77 @@ interface Dice {
     hasEnteredTray: boolean;
     rollId: number;
     groupIndex: number;
-    logicalIndex: number; // for d100, both physical dice share same logicalIndex
+    logicalIndex: number;
     isTens?: boolean;
+    color: THREE.Color;
 }
+
+class InstancedDiceManager {
+    private instances: Map<string, THREE.InstancedMesh> = new Map();
+    private frustum = new THREE.Frustum();
+    private projScreenMatrix = new THREE.Matrix4();
+    private capacity = 256;
+
+    constructor(private scene: THREE.Scene, private material: THREE.Material) {}
+
+    getInstancedMesh(type: DiceType, isTens: boolean): THREE.InstancedMesh {
+        const key = `${type}${isTens ? '-tens' : ''}`;
+        if (this.instances.has(key)) return this.instances.get(key)!;
+
+        const asset = getDiceAsset(type, isTens);
+        const imesh = new THREE.InstancedMesh(asset.geometry, this.material, this.capacity);
+        imesh.castShadow = true;
+        imesh.receiveShadow = true;
+        imesh.frustumCulled = false;
+        imesh.count = 0; // Start with 0
+        this.scene.add(imesh);
+        this.instances.set(key, imesh);
+        return imesh;
+    }
+
+    update(diceList: Dice[], camera: THREE.Camera) {
+        camera.updateMatrixWorld();
+        this.projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse.copy(camera.matrixWorld).invert());
+        this.frustum.setFromProjectionMatrix(this.projScreenMatrix);
+
+        const counts = new Map<string, number>();
+        this.instances.forEach((_, key) => counts.set(key, 0));
+
+        for (const dice of diceList) {
+            const key = `${dice.type}${dice.isTens ? '-tens' : ''}`;
+            const imesh = this.getInstancedMesh(dice.type, !!dice.isTens);
+            const index = counts.get(key) || 0;
+
+            if (index >= this.capacity) {
+                continue;
+            }
+
+            dice.mesh.position.copy(dice.body.position as any);
+            dice.mesh.quaternion.copy(dice.body.quaternion as any);
+            dice.mesh.updateMatrixWorld();
+
+            if (this.frustum.intersectsObject(dice.mesh)) {
+                imesh.setMatrixAt(index, dice.mesh.matrixWorld);
+                imesh.setColorAt(index, dice.color);
+                counts.set(key, index + 1);
+            }
+        }
+
+        this.instances.forEach((imesh, key) => {
+            imesh.count = counts.get(key) || 0;
+            imesh.instanceMatrix.needsUpdate = true;
+            if (imesh.instanceColor) imesh.instanceColor.needsUpdate = true;
+        });
+    }
+
+    reset() {
+        this.instances.forEach((imesh) => {
+            imesh.count = 0;
+        });
+    }
+}
+
+const diceInstanceManager = new InstancedDiceManager(scene, diceMaterial);
 
 const diceList: Dice[] = [];
 let nextRollId = 0;
@@ -831,13 +929,15 @@ function getDiceAsset(type: DiceType, isTens: boolean): CachedDiceAsset {
     }
 
     const faces = applyDiceUVs(geometry, type, isTens);
+    geometry.computeBoundingSphere();
+    geometry.computeBoundingBox();
 
     let shape: CANNON.Shape;
     if (type === 'd6') {
         shape = new CANNON.Box(new CANNON.Vec3(0.4, 0.4, 0.4));
     } else if (type === 'd2') {
         // Cannon Cylinder is oriented along Z axis by default
-        shape = new CANNON.Cylinder(0.8, 0.8, 0.075, 48);
+        shape = new CANNON.Cylinder(0.8, 0.8, 0.075, 8);
     } else {
         shape = createConvexPolyhedron(geometry);
     }
@@ -866,43 +966,17 @@ function createDice(
         ? new THREE.Color(initialState.color)
         : new THREE.Color().setHSL(Math.random(), 0.4, 0.5);
 
-    const normalMapTexture = textureLoader.load("normal.jpg");
-    normalMapTexture.wrapS = THREE.RepeatWrapping;
-    normalMapTexture.wrapT = THREE.RepeatWrapping;
-    normalMapTexture.repeat.set(3, 3);
-
-    const material = new THREE.MeshPhysicalMaterial({
-        color: diceColor,
-        roughness: 0.75,
-        metalness: 0.6,
-        map: diceTexture,
-        bumpMap: normalMapTexture,
-        bumpScale: 0.1,
-        roughnessMap: diceTexture,
-        transmission: 0.4,
-        thickness: 2,
-        ior: 5,
-        transparent: true,
-        opacity: 0.95,
-        normalScale: new THREE.Vector2(0.8),
-        normalMap: normalMapTexture,
-        clearcoatNormalMap: normalMapTexture,
-        clearcoat: 1,
-        clearcoatRoughness: 2,
-        clearcoatNormalScale: new THREE.Vector2(0.2),
-    });
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    scene.add(mesh);
+    // Use shared material for the dummy mesh (used for frustum culling and transforms)
+    const mesh = new THREE.Mesh(geometry, diceMaterial);
+    // Note: mesh is not added to scene, we use InstancedMesh for rendering
 
     const body = new CANNON.Body({
         mass: 50,
         linearDamping: 0.2,
         angularDamping: 0.2,
         allowSleep: true,
-        sleepSpeedLimit: 0.3,
-        sleepTimeLimit: 0.8,
+        sleepSpeedLimit: 1,
+        sleepTimeLimit: 0.4,
         collisionFilterGroup: COLLISION_GROUP_DICE,
         collisionFilterMask: COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND,
     });
@@ -1044,6 +1118,7 @@ function createDice(
         groupIndex,
         logicalIndex,
         isTens,
+        color: diceColor,
     });
 }
 
@@ -1115,10 +1190,10 @@ function evaluateMath(expr: string): number {
 
 (window as any).clearDice = () => {
     for (const dice of diceList) {
-        scene.remove(dice.mesh);
         world.cannonWorld.removeBody(dice.body);
     }
     diceList.length = 0;
+    diceInstanceManager.reset();
     saveState();
 };
 
@@ -1239,7 +1314,6 @@ function pruneDiceList() {
     for (let i = diceList.length - 1; i >= 0; i--) {
         const dice = diceList[i];
         if (!historyIds.has(dice.rollId)) {
-            scene.remove(dice.mesh);
             world.cannonWorld.removeBody(dice.body);
             diceList.splice(i, 1);
         }
@@ -1381,7 +1455,7 @@ function saveState() {
             },
             velocity: { x: d.body.velocity.x, y: d.body.velocity.y, z: d.body.velocity.z },
             angularVelocity: { x: d.body.angularVelocity.x, y: d.body.angularVelocity.y, z: d.body.angularVelocity.z },
-            color: (d.mesh.material as THREE.MeshPhysicalMaterial).color.getHex(),
+            color: d.color.getHex(),
             currentValue: d.currentValue,
             isSettled: d.isSettled,
             hasEnteredTray: d.hasEnteredTray,
@@ -1455,10 +1529,10 @@ function animate(time: number = 0) {
                 dice.body.collisionFilterMask = COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND | COLLISION_GROUP_WALLS;
             }
         }
-
-        dice.mesh.position.copy(dice.body.position as any);
-        dice.mesh.quaternion.copy(dice.body.quaternion as any);
     }
+
+    // Update instanced mesh rendering
+    diceInstanceManager.update(diceList, camera);
 
     updateDiceResults();
 

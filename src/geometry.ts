@@ -35,7 +35,7 @@ function generateGeometry(v: number[], indices: number[]) {
 }
 
 export function getD2() {
-    return new THREE.CylinderGeometry(0.8, 0.8, 0.075, 48).toNonIndexed();
+    return new THREE.CylinderGeometry(0.8, 0.8, 0.075, 32).toNonIndexed();
 }
 
 export function getD4() {
