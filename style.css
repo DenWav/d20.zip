@@ -52,6 +52,21 @@ canvas {
     font-size: 14px;
 }
 
+@media (max-width: 600px) {
+    .dice-btn-group {
+        width: 100%;
+    }
+    .btn {
+        width: 100%;
+    }
+    .dice-btn-main {
+        width: 60%;
+    }
+    .dice-btn-subs {
+        width: 40%;
+    }
+}
+
 button::-moz-focus-inner {
     border: 0;
     padding: 0;
