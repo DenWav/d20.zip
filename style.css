@@ -52,21 +52,6 @@ canvas {
     font-size: 14px;
 }
 
-@media (max-width: 600px) {
-    .dice-btn-group {
-        width: 100%;
-    }
-    .btn {
-        width: 100%;
-    }
-    .dice-btn-main {
-        width: 60%;
-    }
-    .dice-btn-subs {
-        width: 40%;
-    }
-}
-
 button::-moz-focus-inner {
     border: 0;
     padding: 0;
@@ -89,7 +74,7 @@ button::-moz-focus-inner {
     border-radius: 5px;
     outline: none;
     margin: 2px;
-    min-width: 0;
+    min-width: 25%;
     font-size: 14px;
     backdrop-filter: blur(5px);
     pointer-events: auto;
@@ -198,10 +183,18 @@ button::-moz-focus-inner {
 
 @media (max-width: 800px) {
     #history {
-        width: 85%;
+        width: calc(100% - 15vw);
     }
     body.history-open #hamburger {
         transform: translateX(-85vw);
+    }
+    #hamburger {
+        width: calc(min(10vw, 45px));
+        height: calc(min(10vw, 45px));
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
     }
 }
 
@@ -276,6 +269,8 @@ button::-moz-focus-inner {
 .dice-button-row {
     display: flex;
     flex-direction: row;
+    flex-basis: fit-content;
+    flex-wrap: wrap;
     justify-content: space-between;
     width: 100%;
     margin-bottom: 5px;
@@ -291,10 +286,10 @@ button::-moz-focus-inner {
 }
 
 .dice-btn-group {
-    display: inline-flex;
+    display: flex;
     margin: 2px;
-    vertical-align: middle;
     pointer-events: auto;
+    width: calc(50% - 6px);
 }
 
 .dice-btn-group .btn {

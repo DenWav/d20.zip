@@ -1,9 +1,9 @@
-import { THREE, CANNON, OrbitControls } from './vendor.js';
+import { THREE, CANNON, OrbitControls, Stats } from './vendor.js';
 import { World } from './physics.js';
 import { getD2, getD4, getCube, getD8, getD10, getD12, getD20 } from './geometry.js';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
@@ -20,6 +20,13 @@ camera.position.set(0, 25, 15);
 camera.lookAt(0, 0, 0);
 
 const controls = new OrbitControls(camera, renderer.domElement);
+controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
+controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
+controls.mouseButtons.MIDDLE = null;
+
+controls.touches.ONE = THREE.TOUCH.PAN
+controls.touches.TWO = THREE.TOUCH.DOLLY_ROTATE
+
 controls.enableDamping = true;
 controls.screenSpacePanning = false;
 
@@ -27,7 +34,7 @@ controls.screenSpacePanning = false;
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); // Reduced from 0.6
 scene.add(ambientLight);
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); // Increased from 1.0
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5); // Increased from 1.0
 directionalLight.position.set(10, 20, 10);
 directionalLight.castShadow = true;
 directionalLight.shadow.camera.left = -15;
@@ -98,7 +105,7 @@ function createEnvironmentMap() {
     scene.add(mesh);
 
     // Add some random bright points to the env map for highlights
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 12; i++) {
         const light = new THREE.PointLight(0xffffff, 20);
         light.position.set((rng() - 0.5) * 2, rng() * 2, (rng() - 0.5) * 2);
         scene.add(light);
@@ -109,74 +116,49 @@ function createEnvironmentMap() {
 }
 
 scene.environment = createEnvironmentMap();
+scene.environment.mapping = THREE.EquirectangularReflectionMapping;
 
 // Physics World
 const world = new World();
 
 // --- Dice Number Texture ---
 function createDiceTexture() {
-    const rng = mulberry32(12345);
     const canvas = document.createElement('canvas');
     // Double resolution for better sharpness
-    canvas.width = 2048;
-    canvas.height = 3072; // 10 x 15 grid
+    canvas.width = 4096;
+    canvas.height = canvas.width * 1.5; // 10 x 15 grid
     const ctx = canvas.getContext('2d')!;
 
     // Base color
     ctx.fillStyle = '#eeeeee';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Subtle Marble/Granite Texture
-    // Layer 1: Larger speckles
-    for (let i = 0; i < 5000; i++) {
-        const opacity = 0.2 + rng() * 0.3;
-        ctx.fillStyle = rng() > 0.5 ? `rgba(0,0,0,${opacity})` : `rgba(255,255,255,${opacity})`;
-        const x = rng() * canvas.width;
-        const y = rng() * canvas.height;
-        const s = 4 + rng() * 6;
-        ctx.fillRect(x, y, s, s);
-    }
-
-    // Layer 2: Fine dust particles
-    for (let i = 0; i < 25000; i++) {
-        const opacity = 0.2 + rng() * 0.4;
-        ctx.fillStyle = rng() > 0.5 ? `rgba(0,0,0,${opacity})` : `rgba(255,255,255,${opacity})`;
-        const x = rng() * canvas.width;
-        const y = rng() * canvas.height;
-        const s = 2 + rng() * 2;
-        ctx.fillRect(x, y, s, s);
-    }
-
     const gridSize = 10;
-    const cellSize = 2048 / gridSize;
+    const cellSize = 4096 / gridSize;
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    // Base font size (scaled for 2048 resolution)
-    ctx.font = 'bold 80px Arial';
-    ctx.fillStyle = '#222222';
+    // Base font size (scaled for 4096 resolution)
+    ctx.font = 'bold 160px Arial';
+    ctx.fillStyle = '#4c4c4c';
 
-    // Add shadow blur to create a gradient for the bump map (the "bevel")
-    ctx.shadowColor = 'rgba(0,0,0,0.8)';
-    ctx.shadowBlur = 2;
-
-    // 1-100
-    for (let i = 0; i < 100; i++) {
+    // 1-20
+    for (let i = 0; i < 20; i++) {
         const x = (i % gridSize) * cellSize + cellSize / 2;
         const y = Math.floor(i / gridSize) * cellSize + cellSize / 2;
         ctx.fillText((i + 1).toString(), x, y);
     }
 
     // 00-90 for D100 tens
-    ctx.font = 'bold 65px Arial';
+    ctx.font = 'bold 170px Arial';
     for (let i = 0; i < 10; i++) {
         const x = (i % gridSize) * cellSize + cellSize / 2;
         const y = (10 + Math.floor(i / gridSize)) * cellSize + cellSize / 2;
         ctx.fillText((i * 10).toString().padStart(2, '0'), x, y);
     }
 
-    // 0-9 for D10 (often 0-9 instead of 1-10)
-    ctx.font = 'bold 80px Arial';
+    // 0-9 for D10
+    ctx.font = 'bold 160px Arial';
     for (let i = 0; i < 10; i++) {
         const x = (i % gridSize) * cellSize + cellSize / 2;
         const y = (11 + Math.floor(i / gridSize)) * cellSize + cellSize / 2;
@@ -184,7 +166,7 @@ function createDiceTexture() {
     }
 
     // D4 special cells in row 12
-    ctx.font = 'bold 45px Arial';
+    ctx.font = 'bold 70px Arial';
     const d4Faces = [
         [2, 4, 3],
         [1, 3, 4],
@@ -196,7 +178,7 @@ function createDiceTexture() {
         { x: 0.2, y: 0.75 },
         { x: 0.8, y: 0.75 },
     ];
-    const vCenter = { x: 0.5, y: 0.5768 };
+    const vCenter = { x: 0.5, y: 0.6 };
 
     for (let i = 0; i < 4; i++) {
         const xBase = i * cellSize;
@@ -233,7 +215,7 @@ function createDiceTexture() {
 function createFeltTexture() {
     const rng = mulberry32(54321);
     const canvas = document.createElement('canvas');
-    const size = 512;
+    const size = 2048;
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext('2d')!;
@@ -255,15 +237,15 @@ function createFeltTexture() {
         }
     };
 
-    // Add fiber noise - more fibers, more opaque, slightly larger
-    for (let i = 0; i < 60000; i++) {
+    // Add fiber noise
+    for (let i = 0; i < 80000; i++) {
         const x = rng() * size;
         const y = rng() * size;
         const len = rng() * 8 + 2;
         const angle = rng() * Math.PI * 2;
-        const opacity = rng() * 0.4;
+        const opacity = rng() * 0.5;
         const color = rng() > 0.5 ? `rgba(255,255,255,${opacity})` : `rgba(0,0,0,${opacity})`;
-        const lineWidth = rng() * 0.8 + 0.4;
+        const lineWidth = rng() * 0.8 + 0.5;
 
         const dx = Math.cos(angle) * len;
         const dy = Math.sin(angle) * len;
@@ -279,11 +261,11 @@ function createFeltTexture() {
     }
 
     // Add more noticeable organic splotches
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 400; i++) {
         const x = rng() * size;
         const y = rng() * size;
-        const radius = rng() * 100 + 50;
-        const opacity = rng() * 0.15;
+        const radius = rng() * 100 + 5;
+        const opacity = rng() * 0.025;
         const colorStop = rng() > 0.5 ? `rgba(255,255,255,${opacity})` : `rgba(0,0,0,${opacity})`;
 
         drawSeamless(x, y, radius, (ox, oy) => {
@@ -304,6 +286,7 @@ function createFeltTexture() {
     return texture;
 }
 
+const textureLoader = new THREE.TextureLoader();
 const diceTexture = createDiceTexture();
 const feltTexture = createFeltTexture();
 
@@ -598,8 +581,8 @@ const floorMesh = new THREE.Mesh(
         color: 0x3c69a0, // Adjusted blue to compensate for texture base
         map: feltTexture,
         bumpMap: feltTexture,
-        bumpScale: 0.1, // Increased for more visible texture
-        roughness: 0.95,
+        bumpScale: 2,
+        roughness: 2,
         roughnessMap: feltTexture,
         metalness: 0.0,
     })
@@ -847,7 +830,7 @@ function getDiceAsset(type: DiceType, isTens: boolean): CachedDiceAsset {
         shape = new CANNON.Box(new CANNON.Vec3(0.4, 0.4, 0.4));
     } else if (type === 'd2') {
         // Cannon Cylinder is oriented along Z axis by default
-        shape = new CANNON.Cylinder(0.8, 0.8, 0.075, 16);
+        shape = new CANNON.Cylinder(0.8, 0.8, 0.075, 48);
     } else {
         shape = createConvexPolyhedron(geometry);
     }
@@ -875,20 +858,31 @@ function createDice(
     const diceColor = initialState?.color
         ? new THREE.Color(initialState.color)
         : new THREE.Color().setHSL(Math.random(), 0.4, 0.5);
+
+    const normalMapTexture = textureLoader.load("normal.jpg");
+    normalMapTexture.wrapS = THREE.RepeatWrapping;
+    normalMapTexture.wrapT = THREE.RepeatWrapping;
+    normalMapTexture.repeat.set(3, 3);
+
     const material = new THREE.MeshPhysicalMaterial({
         color: diceColor,
-        roughness: 0.75, // Slightly reduced for more reactive highlights
-        metalness: 0.1, // Slight metalness for sharper specular
+        roughness: 0.75,
+        metalness: 0.6,
         map: diceTexture,
-        bumpMap: diceTexture,
+        bumpMap: normalMapTexture,
         bumpScale: 0.1,
         roughnessMap: diceTexture,
-        transmission: 0.2, // Slightly increased
-        thickness: 1.0,
-        ior: 1.52, // Glass IOR
+        transmission: 0.4,
+        thickness: 2,
+        ior: 5,
         transparent: true,
-        opacity: 0.98,
-        envMapIntensity: 1.5, // Boost environment reflections
+        opacity: 0.95,
+        normalScale: new THREE.Vector2(0.8),
+        normalMap: normalMapTexture,
+        clearcoatNormalMap: normalMapTexture,
+        clearcoat: 1,
+        clearcoatRoughness: 2,
+        clearcoatNormalScale: new THREE.Vector2(0.2),
     });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.castShadow = true;
@@ -1431,7 +1425,13 @@ function loadState() {
     }
 }
 
+const stats = new Stats()
+stats.showPanel(0) // 0: fps, 1: ms, 2: mb, 3+: custom
+stats.dom.style.zIndex = '999'
+document.body.appendChild(stats.dom)
+
 function animate(time: number = 0) {
+    stats.begin()
     if (lastTime === 0) lastTime = time;
     const dt = (time - lastTime) / 1000;
     lastTime = time;
@@ -1456,6 +1456,8 @@ function animate(time: number = 0) {
     updateDiceResults();
 
     renderer.render(scene, camera);
+    stats.end()
+
     requestAnimationFrame(animate);
 }
 

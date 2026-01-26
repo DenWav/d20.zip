@@ -10,6 +10,7 @@
     },
     "dependencies": {
         "cannon-es": "^0.20.0",
+        "stats.js": "^0.17.0",
         "three": "^0.182.0"
     },
     "devDependencies": {

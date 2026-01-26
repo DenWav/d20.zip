@@ -6,7 +6,7 @@ export class World {
     constructor() {
         this.cannonWorld = new CANNON.World();
         this.cannonWorld.allowSleep = true;
-        this.cannonWorld.gravity.set(0, -24, 0);
+        this.cannonWorld.gravity.set(0, -48, 0);
         this.cannonWorld.broadphase = new CANNON.NaiveBroadphase();
 
         const solver = new CANNON.GSSolver();
@@ -19,7 +19,7 @@ export class World {
         const defaultContactMaterial = new CANNON.ContactMaterial(defaultMaterial, defaultMaterial, {
             friction: 0.9,
             restitution: 0.1,
-            contactEquationStiffness: 1e6,
+            contactEquationStiffness: 1e8,
             contactEquationRelaxation: 10,
             frictionEquationStiffness: 1e6,
             frictionEquationRelaxation: 10,
