@@ -36,7 +36,7 @@ jobs:
               run: |
                   mkdir _site
                   cp index.html style.css favicon.png _site/
-                  cp -r dist _site/
+                  cp -r dist src _site/
             - name: Upload artifact
               uses: actions/upload-pages-artifact@v4
               with:
