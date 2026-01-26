@@ -59,7 +59,7 @@ function createEnvironmentMap() {
             topColor: { value: new THREE.Color(0x333333) },
             bottomColor: { value: new THREE.Color(0x111111) },
             offset: { value: 33 },
-            exponent: { value: 0.6 }
+            exponent: { value: 0.6 },
         },
         vertexShader: `
             varying vec3 vWorldPosition;
@@ -79,19 +79,15 @@ function createEnvironmentMap() {
                 float h = normalize(vWorldPosition + offset).y;
                 gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
             }
-        `
+        `,
     });
     const mesh = new THREE.Mesh(geom, mat);
     scene.add(mesh);
-    
+
     // Add some random bright points to the env map for highlights
     for (let i = 0; i < 6; i++) {
         const light = new THREE.PointLight(0xffffff, 20);
-        light.position.set(
-            (Math.random() - 0.5) * 2,
-            Math.random() * 2,
-            (Math.random() - 0.5) * 2
-        );
+        light.position.set((Math.random() - 0.5) * 2, Math.random() * 2, (Math.random() - 0.5) * 2);
         scene.add(light);
     }
 
@@ -111,7 +107,7 @@ function createDiceTexture() {
     canvas.width = 2048;
     canvas.height = 3072; // 10 x 15 grid
     const ctx = canvas.getContext('2d')!;
-    
+
     // Base color
     ctx.fillStyle = '#eeeeee';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -145,7 +141,7 @@ function createDiceTexture() {
     // Base font size (scaled for 2048 resolution)
     ctx.font = 'bold 80px Arial';
     ctx.fillStyle = '#222222';
-    
+
     // Add shadow blur to create a gradient for the bump map (the "bevel")
     ctx.shadowColor = 'rgba(0,0,0,0.8)';
     ctx.shadowBlur = 2;
@@ -164,7 +160,7 @@ function createDiceTexture() {
         const y = (10 + Math.floor(i / gridSize)) * cellSize + cellSize / 2;
         ctx.fillText((i * 10).toString().padStart(2, '0'), x, y);
     }
-    
+
     // 0-9 for D10 (often 0-9 instead of 1-10)
     ctx.font = 'bold 80px Arial';
     for (let i = 0; i < 10; i++) {
@@ -179,12 +175,12 @@ function createDiceTexture() {
         [2, 4, 3],
         [1, 3, 4],
         [1, 4, 2],
-        [1, 2, 3]
+        [1, 2, 3],
     ];
     const vPos = [
         { x: 0.5, y: 0.2304 },
         { x: 0.2, y: 0.75 },
-        { x: 0.8, y: 0.75 }
+        { x: 0.8, y: 0.75 },
     ];
     const vCenter = { x: 0.5, y: 0.5768 };
 
@@ -192,19 +188,19 @@ function createDiceTexture() {
         const xBase = i * cellSize;
         const yBase = 12 * cellSize;
         const nums = d4Faces[i];
-        
+
         nums.forEach((num, j) => {
             const v = vPos[j];
             const dx = v.x - vCenter.x;
             const dy = v.y - vCenter.y;
-            
+
             // Move 50% from vertex towards center for legibility
             const pX = vCenter.x + dx * 0.5;
             const pY = vCenter.y + dy * 0.5;
-            
+
             // Rotate so "up" points towards vertex
             const angle = Math.atan2(dy, dx) + Math.PI / 2;
-            
+
             ctx.save();
             ctx.translate(xBase + pX * cellSize, yBase + pY * cellSize);
             ctx.rotate(angle);
@@ -253,7 +249,7 @@ function createFeltTexture() {
         const opacity = Math.random() * 0.4;
         const color = Math.random() > 0.5 ? `rgba(255,255,255,${opacity})` : `rgba(0,0,0,${opacity})`;
         const lineWidth = Math.random() * 0.8 + 0.4;
-        
+
         const dx = Math.cos(angle) * len;
         const dy = Math.sin(angle) * len;
 
@@ -309,7 +305,7 @@ function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = f
 
     const gridSize = 10;
     const gridHeight = 15;
-    
+
     // Group triangles by normal
     const uniqueNormals: THREE.Vector3[] = [];
     const normalGroups: number[][] = [];
@@ -318,12 +314,9 @@ function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = f
         const v1 = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
         const v2 = new THREE.Vector3(pos.getX(i + 1), pos.getY(i + 1), pos.getZ(i + 1));
         const v3 = new THREE.Vector3(pos.getX(i + 2), pos.getY(i + 2), pos.getZ(i + 2));
-        
-        const normal = new THREE.Vector3().crossVectors(
-            v2.clone().sub(v1),
-            v3.clone().sub(v1)
-        ).normalize();
-        
+
+        const normal = new THREE.Vector3().crossVectors(v2.clone().sub(v1), v3.clone().sub(v1)).normalize();
+
         let foundIndex = -1;
         for (let j = 0; j < uniqueNormals.length; j++) {
             // Use dot product to group nearly-coplanar triangles (important for D10)
@@ -342,15 +335,17 @@ function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = f
     }
 
     // Sort to have consistent mapping (highest Y first)
-    const sortedIndices = uniqueNormals.map((_, i) => i).sort((i, j) => {
-        const a = uniqueNormals[i];
-        const b = uniqueNormals[j];
-        // Sort by Y, then Z, then X with small epsilon
-        const eps = 0.01;
-        if (Math.abs(b.y - a.y) > eps) return b.y - a.y;
-        if (Math.abs(b.z - a.z) > eps) return b.z - a.z;
-        return b.x - a.x;
-    });
+    const sortedIndices = uniqueNormals
+        .map((_, i) => i)
+        .sort((i, j) => {
+            const a = uniqueNormals[i];
+            const b = uniqueNormals[j];
+            // Sort by Y, then Z, then X with small epsilon
+            const eps = 0.01;
+            if (Math.abs(b.y - a.y) > eps) return b.y - a.y;
+            if (Math.abs(b.z - a.z) > eps) return b.z - a.z;
+            return b.x - a.x;
+        });
 
     let baseRow = 0;
     let valueMultiplier = 1;
@@ -372,11 +367,11 @@ function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = f
         sortedIndices.forEach((normalIndex) => {
             const normal = uniqueNormals[normalIndex];
             const triangleIndices = normalGroups[normalIndex];
-            
+
             let value = 0;
             if (normal.y > 0.9) value = 1;
             else if (normal.y < -0.9) value = 2;
-            
+
             if (value > 0) {
                 faces.push({ normal, value });
                 const col = (value - 1) % gridSize;
@@ -411,14 +406,20 @@ function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = f
 
     if (type === 'd4') {
         const d4FaceSets = [
-            [2, 4, 3], [1, 3, 4], [1, 4, 2], [1, 2, 3]
+            [2, 4, 3],
+            [1, 3, 4],
+            [1, 4, 2],
+            [1, 2, 3],
         ];
         const uniqueVertices: THREE.Vector3[] = [];
         for (let i = 0; i < pos.count; i++) {
             const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
             let found = false;
             for (const uv of uniqueVertices) {
-                if (uv.distanceTo(v) < 0.01) { found = true; break; }
+                if (uv.distanceTo(v) < 0.01) {
+                    found = true;
+                    break;
+                }
             }
             if (!found) uniqueVertices.push(v);
         }
@@ -432,7 +433,7 @@ function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = f
             const normal = uniqueNormals[normalIndex];
             const triangleIndices = normalGroups[normalIndex];
             const i0 = triangleIndices[0];
-            
+
             const bVals: number[] = [];
             for (let j = 0; j < 3; j++) {
                 const v = new THREE.Vector3(pos.getX(i0 + j), pos.getY(i0 + j), pos.getZ(i0 + j));
@@ -449,7 +450,11 @@ function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = f
             for (let col = 0; col < 4; col++) {
                 const atlasVals = d4FaceSets[col];
                 for (let s = 0; s < 3; s++) {
-                    if (atlasVals[0] === bVals[s] && atlasVals[1] === bVals[(s + 1) % 3] && atlasVals[2] === bVals[(s + 2) % 3]) {
+                    if (
+                        atlasVals[0] === bVals[s] &&
+                        atlasVals[1] === bVals[(s + 1) % 3] &&
+                        atlasVals[2] === bVals[(s + 2) % 3]
+                    ) {
                         atlasCol = col;
                         shift = s;
                         break;
@@ -468,7 +473,7 @@ function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = f
             const positions = [
                 { x: 0.5, y: 0.2304 },
                 { x: 0.2, y: 0.75 },
-                { x: 0.8, y: 0.75 }
+                { x: 0.8, y: 0.75 },
             ];
 
             for (const i of triangleIndices) {
@@ -487,21 +492,21 @@ function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = f
         const normal = uniqueNormals[normalIndex];
         const value = index * valueMultiplier + valueOffset;
         faces.push({ normal, value });
-        
+
         const triangleIndices = normalGroups[normalIndex];
-        
+
         // Calculate face center
         const center = new THREE.Vector3();
         for (const i of triangleIndices) {
             for (let j = 0; j < 3; j++) {
-                center.add(new THREE.Vector3(pos.getX(i+j), pos.getY(i+j), pos.getZ(i+j)));
+                center.add(new THREE.Vector3(pos.getX(i + j), pos.getY(i + j), pos.getZ(i + j)));
             }
         }
         center.divideScalar(triangleIndices.length * 3);
 
         const col = index % gridSize;
         const row = baseRow + Math.floor(index / gridSize);
-        
+
         const uMin = col / gridSize;
         const uMax = (col + 1) / gridSize;
         const vMin = 1 - (row + 1) / gridHeight;
@@ -514,14 +519,19 @@ function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = f
         const bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
 
         // Find bounding box in local 2D space to scale properly
-        let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+        let minU = Infinity,
+            maxU = -Infinity,
+            minV = Infinity,
+            maxV = -Infinity;
         for (const i of triangleIndices) {
             for (let j = 0; j < 3; j++) {
                 const v = new THREE.Vector3(pos.getX(i + j), pos.getY(i + j), pos.getZ(i + j)).sub(center);
                 const uu = v.dot(tangent);
                 const vv = v.dot(bitangent);
-                minU = Math.min(minU, uu); maxU = Math.max(maxU, uu);
-                minV = Math.min(minV, vv); maxV = Math.max(maxV, vv);
+                minU = Math.min(minU, uu);
+                maxU = Math.max(maxU, uu);
+                minV = Math.min(minV, vv);
+                maxV = Math.max(maxV, vv);
             }
         }
 
@@ -535,14 +545,14 @@ function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = f
         for (const i of triangleIndices) {
             for (let j = 0; j < 3; j++) {
                 const vertex = new THREE.Vector3(pos.getX(i + j), pos.getY(i + j), pos.getZ(i + j)).sub(center);
-                
+
                 const u = vertex.dot(tangent);
                 const v = vertex.dot(bitangent);
-                
+
                 // Scale and center in UV cell
                 const cellU = u * scale + 0.5;
                 const cellV = v * scale + 0.5;
-                
+
                 uvs[(i + j) * 2] = uMin + cellU * (uMax - uMin);
                 uvs[(i + j) * 2 + 1] = vMin + cellV * (vMax - vMin);
             }
@@ -569,7 +579,7 @@ const floorRadius = wallLimit / Math.cos(Math.PI / wallCount);
 // Floor for visual reference
 const floorMesh = new THREE.Mesh(
     new THREE.CylinderGeometry(floorRadius, floorRadius, floorThickness, wallCount),
-    new THREE.MeshStandardMaterial({ 
+    new THREE.MeshStandardMaterial({
         color: 0x3c69a0, // Adjusted blue to compensate for texture base
         map: feltTexture,
         bumpMap: feltTexture,
@@ -589,7 +599,7 @@ const floorBody = new CANNON.Body({
     mass: 0,
     shape: new CANNON.Plane(),
     collisionFilterGroup: COLLISION_GROUP_GROUND,
-    collisionFilterMask: COLLISION_GROUP_DICE
+    collisionFilterMask: COLLISION_GROUP_DICE,
 });
 floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
 world.addBody(floorBody);
@@ -606,7 +616,7 @@ for (let i = 0; i < wallCount; i++) {
     const angle = (i * 2 * Math.PI) / wallCount;
     const x = Math.cos(angle) * wallLimit;
     const z = Math.sin(angle) * wallLimit;
-    
+
     // Visual wall
     const wallMesh = new THREE.Mesh(wallGeom, wallMaterial);
     wallMesh.position.set(x, wallHeight / 2 - floorThickness, z);
@@ -614,20 +624,22 @@ for (let i = 0; i < wallCount; i++) {
     wallMesh.castShadow = true;
     wallMesh.receiveShadow = true;
     scene.add(wallMesh);
-    
+
     // Physics wall (Thicker box to prevent clipping)
     // We want the inner face to match the visual wall's inner face.
     // Visual inner face distance = wallLimit - wallThickness / 2
     // Physics center distance = (wallLimit - wallThickness / 2) + physicsWallThickness / 2
-    const physicsCenterDist = (wallLimit - wallThickness / 2) + physicsWallThickness / 2;
+    const physicsCenterDist = wallLimit - wallThickness / 2 + physicsWallThickness / 2;
     const px = Math.cos(angle) * physicsCenterDist;
     const pz = Math.sin(angle) * physicsCenterDist;
 
-    const body = new CANNON.Body({ 
-        mass: 0, 
-        shape: new CANNON.Box(new CANNON.Vec3(wallSideLength / 2 + 1.0, physicsWallHeight / 2, physicsWallThickness / 2)),
+    const body = new CANNON.Body({
+        mass: 0,
+        shape: new CANNON.Box(
+            new CANNON.Vec3(wallSideLength / 2 + 1.0, physicsWallHeight / 2, physicsWallThickness / 2)
+        ),
         collisionFilterGroup: COLLISION_GROUP_WALLS,
-        collisionFilterMask: COLLISION_GROUP_DICE
+        collisionFilterMask: COLLISION_GROUP_DICE,
     });
     body.position.set(px, physicsWallHeight / 2 - floorThickness, pz);
     body.quaternion.copy(wallMesh.quaternion as any);
@@ -671,7 +683,7 @@ const maxHistory = 20;
 
 function formatBreakdown(record: RollRecord): string {
     if (record.result === null) return 'Rolling...';
-    
+
     return record.template.replace(/__G(\d+)__/g, (_, idxStr) => {
         const idx = parseInt(idxStr);
         const vals = record.groupResults[idx];
@@ -687,7 +699,9 @@ function formatBreakdown(record: RollRecord): string {
 function updateHistoryUI() {
     const historyListEl = document.getElementById('history-list');
     if (historyListEl) {
-        historyListEl.innerHTML = rollHistory.map((record) => `
+        historyListEl.innerHTML = rollHistory
+            .map(
+                (record) => `
             <div class="history-item">
                 <div class="history-header">
                     <span>${record.formula}</span>
@@ -696,7 +710,9 @@ function updateHistoryUI() {
                 ${record.result !== null ? `<div class="history-breakdown">${formatBreakdown(record)}</div>` : ''}
                 <button class="re-roll-btn" onclick="window.reRollById(${record.id})">Re-roll</button>
             </div>
-        `).join('');
+        `
+            )
+            .join('');
     }
 
     const latestResultEl = document.getElementById('latest-result');
@@ -719,7 +735,7 @@ function addToHistory(formula: string, template: string, id: number, groups: Rol
 }
 
 (window as any).reRollById = (id: number) => {
-    const record = rollHistory.find(r => r.id === id);
+    const record = rollHistory.find((r) => r.id === id);
     if (record) {
         (window as any).rollFormula(record.formula);
     }
@@ -730,14 +746,14 @@ function createConvexPolyhedron(geometry: THREE.BufferGeometry) {
     const vertices: CANNON.Vec3[] = [];
     const faces: number[][] = [];
     const vertexMap = new Map<string, number>();
-    
+
     for (let i = 0; i < position.count; i += 3) {
         const face: number[] = [];
         for (let j = 0; j < 3; j++) {
             const vx = position.getX(i + j);
             const vy = position.getY(i + j);
             const vz = position.getZ(i + j);
-            
+
             const key = `${Math.round(vx * 100)},${Math.round(vy * 100)},${Math.round(vz * 100)}`;
             let index = vertexMap.get(key);
             if (index === undefined) {
@@ -769,19 +785,35 @@ function getDiceAsset(type: DiceType, isTens: boolean): CachedDiceAsset {
     }
 
     let geometry: THREE.BufferGeometry;
-    switch(type) {
-        case 'd2': geometry = getD2(); break;
-        case 'd4': geometry = getD4(); break;
-        case 'd6': geometry = getCube(); break;
-        case 'd8': geometry = getD8(); break;
-        case 'd10': case 'd100': geometry = getD10(); break;
-        case 'd12': geometry = getD12(); break;
-        case 'd20': geometry = getD20(); break;
-        default: geometry = getCube();
+    switch (type) {
+        case 'd2':
+            geometry = getD2();
+            break;
+        case 'd4':
+            geometry = getD4();
+            break;
+        case 'd6':
+            geometry = getCube();
+            break;
+        case 'd8':
+            geometry = getD8();
+            break;
+        case 'd10':
+        case 'd100':
+            geometry = getD10();
+            break;
+        case 'd12':
+            geometry = getD12();
+            break;
+        case 'd20':
+            geometry = getD20();
+            break;
+        default:
+            geometry = getCube();
     }
 
     const faces = applyDiceUVs(geometry, type, isTens);
-    
+
     let shape: CANNON.Shape;
     if (type === 'd6') {
         shape = new CANNON.Box(new CANNON.Vec3(0.4, 0.4, 0.4));
@@ -798,14 +830,25 @@ function getDiceAsset(type: DiceType, isTens: boolean): CachedDiceAsset {
     return asset;
 }
 
-function createDice(type: DiceType, rollId: number, isTens = false, groupIndex = 0, logicalIndex = 0, indexInRoll = 0, totalInRoll = 1, initialState?: any) {
+function createDice(
+    type: DiceType,
+    rollId: number,
+    isTens = false,
+    groupIndex = 0,
+    logicalIndex = 0,
+    indexInRoll = 0,
+    totalInRoll = 1,
+    initialState?: any
+) {
     const asset = getDiceAsset(type, isTens);
     const geometry = asset.geometry;
     const shape = asset.shape;
     const faces = asset.faces;
-    
-    const diceColor = initialState?.color ? new THREE.Color(initialState.color) : new THREE.Color().setHSL(Math.random(), 0.4, 0.5);
-    const material = new THREE.MeshPhysicalMaterial({ 
+
+    const diceColor = initialState?.color
+        ? new THREE.Color(initialState.color)
+        : new THREE.Color().setHSL(Math.random(), 0.4, 0.5);
+    const material = new THREE.MeshPhysicalMaterial({
         color: diceColor,
         roughness: 0.75, // Slightly reduced for more reactive highlights
         metalness: 0.1, // Slight metalness for sharper specular
@@ -818,7 +861,7 @@ function createDice(type: DiceType, rollId: number, isTens = false, groupIndex =
         ior: 1.52, // Glass IOR
         transparent: true,
         opacity: 0.98,
-        envMapIntensity: 1.5 // Boost environment reflections
+        envMapIntensity: 1.5, // Boost environment reflections
     });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.castShadow = true;
@@ -833,18 +876,27 @@ function createDice(type: DiceType, rollId: number, isTens = false, groupIndex =
         sleepSpeedLimit: 0.2,
         sleepTimeLimit: 1.0,
         collisionFilterGroup: COLLISION_GROUP_DICE,
-        collisionFilterMask: COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND
+        collisionFilterMask: COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND,
     });
 
     body.addShape(shape);
-    
+
     let hasEnteredTray: boolean;
     if (initialState) {
         body.position.set(initialState.position.x, initialState.position.y, initialState.position.z);
-        body.quaternion.set(initialState.quaternion.x, initialState.quaternion.y, initialState.quaternion.z, initialState.quaternion.w);
+        body.quaternion.set(
+            initialState.quaternion.x,
+            initialState.quaternion.y,
+            initialState.quaternion.z,
+            initialState.quaternion.w
+        );
         body.velocity.set(initialState.velocity.x, initialState.velocity.y, initialState.velocity.z);
-        body.angularVelocity.set(initialState.angularVelocity.x, initialState.angularVelocity.y, initialState.angularVelocity.z);
-        
+        body.angularVelocity.set(
+            initialState.angularVelocity.x,
+            initialState.angularVelocity.y,
+            initialState.angularVelocity.z
+        );
+
         mesh.position.copy(body.position as any);
         mesh.quaternion.copy(body.quaternion as any);
 
@@ -852,11 +904,14 @@ function createDice(type: DiceType, rollId: number, isTens = false, groupIndex =
     } else {
         // Scale spread from 0.3 (for 2 dice) to 2*PI (at 20 dice)
         const minSpread = 0.3;
-        const spread = totalInRoll > 1 ? (minSpread + Math.max(0, Math.min(1, (totalInRoll - 2) / 18)) * (Math.PI * 2 - minSpread)) : 0;
-        
+        const spread =
+            totalInRoll > 1
+                ? minSpread + Math.max(0, Math.min(1, (totalInRoll - 2) / 18)) * (Math.PI * 2 - minSpread)
+                : 0;
+
         // Throw from an angle relative to camera (only horizontal angle)
         let finalAngle = controls.getAzimuthalAngle();
-        
+
         if (totalInRoll > 1) {
             // Center the spread on azAngle
             const offset = (indexInRoll / (totalInRoll - 1) - 0.5) * spread;
@@ -869,14 +924,14 @@ function createDice(type: DiceType, rollId: number, isTens = false, groupIndex =
             8.0 + Math.random() * 4.0,
             Math.cos(finalAngle) * spawnDistance
         );
-        
+
         // Add some random jitter to spawn position
         spawnPos.x += (Math.random() - 0.5) * 4;
         spawnPos.z += (Math.random() - 0.5) * 4;
-        
+
         body.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
         mesh.position.copy(spawnPos);
-        
+
         if (type === 'd2') {
             // Coin starts flat (since we aligned the shape to Y axis)
             body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), Math.random() * Math.PI * 2);
@@ -886,22 +941,22 @@ function createDice(type: DiceType, rollId: number, isTens = false, groupIndex =
             body.quaternion.setFromAxisAngle(new CANNON.Vec3(axis.x, axis.y, axis.z), rotAngle);
         }
         mesh.quaternion.copy(body.quaternion as any);
-        
+
         // Velocity: towards the center area
         const throwTarget = new THREE.Vector3(
             (Math.random() - 0.5) * wallLimit * 0.5,
             0,
             (Math.random() - 0.5) * wallLimit * 0.5
         );
-        
+
         // Calculate horizontal direction only
         const horizontalDir = new THREE.Vector3().subVectors(throwTarget, spawnPos);
         horizontalDir.y = 0;
         horizontalDir.normalize();
-        
+
         const speed = 15 + Math.random() * 10;
         const velVec = horizontalDir.clone().multiplyScalar(speed);
-        
+
         if (type === 'd2') {
             // Coin flip: significant upward velocity
             velVec.y = 8 + Math.random() * 6;
@@ -910,11 +965,11 @@ function createDice(type: DiceType, rollId: number, isTens = false, groupIndex =
             velVec.z *= 0.8;
         } else {
             // Slight upward arc for the throw
-            velVec.y = 2 + Math.random() * 6; 
+            velVec.y = 2 + Math.random() * 6;
         }
-        
+
         body.velocity.set(velVec.x, velVec.y, velVec.z);
-        
+
         // Ensure significant initial rotation (tumbling)
         if (type === 'd2') {
             // Flip the coin around a horizontal axis perpendicular to its movement
@@ -927,8 +982,8 @@ function createDice(type: DiceType, rollId: number, isTens = false, groupIndex =
             );
         } else {
             body.angularVelocity.set(
-                (Math.random() - 0.5) * 40, 
-                (Math.random() - 0.5) * 40, 
+                (Math.random() - 0.5) * 40,
+                (Math.random() - 0.5) * 40,
                 (Math.random() - 0.5) * 40
             );
         }
@@ -943,18 +998,18 @@ function createDice(type: DiceType, rollId: number, isTens = false, groupIndex =
     }
 
     world.addBody(body);
-    diceList.push({ 
-        body, 
-        mesh, 
-        type, 
-        faces, 
-        currentValue: initialState ? initialState.currentValue : null, 
-        isSettled: initialState ? initialState.isSettled : false, 
+    diceList.push({
+        body,
+        mesh,
+        type,
+        faces,
+        currentValue: initialState ? initialState.currentValue : null,
+        isSettled: initialState ? initialState.isSettled : false,
         hasEnteredTray,
         rollId,
         groupIndex,
         logicalIndex,
-        isTens
+        isTens,
     });
 }
 
@@ -964,8 +1019,10 @@ function evaluateMath(expr: string): number {
     const ops: string[] = [];
 
     const precedence: { [key: string]: number } = {
-        '+': 1, '-': 1,
-        '*': 2, '/': 2
+        '+': 1,
+        '-': 1,
+        '*': 2,
+        '/': 2,
     };
 
     const applyOp = () => {
@@ -974,12 +1031,18 @@ function evaluateMath(expr: string): number {
         const b = values.pop()!;
         const a = values.pop()!;
         switch (op) {
-            case '+': values.push(a + b); break;
-            case '-': values.push(a - b); break;
-            case '*': values.push(a * b); break;
-            case '/': 
+            case '+':
+                values.push(a + b);
+                break;
+            case '-':
+                values.push(a - b);
+                break;
+            case '*':
+                values.push(a * b);
+                break;
+            case '/':
                 const res = a / b;
-                values.push(Math.round(res * 10) / 10); 
+                values.push(Math.round(res * 10) / 10);
                 break;
         }
     };
@@ -994,7 +1057,7 @@ function evaluateMath(expr: string): number {
             while (ops.length && ops[ops.length - 1] !== '(') {
                 applyOp();
             }
-            ops.pop(); 
+            ops.pop();
         } else {
             while (ops.length && ops[ops.length - 1] !== '(' && precedence[ops[ops.length - 1]] >= precedence[t]) {
                 applyOp();
@@ -1042,7 +1105,7 @@ function evaluateMath(expr: string): number {
         history.classList.toggle('open');
     }
     document.body.classList.toggle('history-open');
-    
+
     const hamburger = document.getElementById('hamburger');
     if (hamburger) {
         hamburger.innerText = document.body.classList.contains('history-open') ? '✕' : '☰';
@@ -1054,9 +1117,9 @@ function evaluateMath(expr: string): number {
     const rollId = nextRollId++;
     const groups: RollGroup[] = [];
     let template = formula.toLowerCase();
-    
+
     const diceRegex = /(\d*)d(\d+)(kh|kl)?(\d*)/g;
-    
+
     // First pass: count total physical dice
     let totalPhysicalDice = 0;
     const matches = Array.from(template.matchAll(diceRegex));
@@ -1065,13 +1128,13 @@ function evaluateMath(expr: string): number {
         const sides = parseInt(match[2]);
         const typeSupported = [2, 4, 6, 8, 10, 12, 20, 100].includes(sides);
         if (typeSupported) {
-            totalPhysicalDice += (sides === 100 ? count * 2 : count);
+            totalPhysicalDice += sides === 100 ? count * 2 : count;
         }
     }
 
     let groupCounter = 0;
     let diceCounter = 0;
-    
+
     template = template.replace(diceRegex, (match, p1, p2, p3, p4) => {
         const groupIndex = groupCounter++;
         const count = p1 === '' ? 1 : parseInt(p1);
@@ -1079,7 +1142,7 @@ function evaluateMath(expr: string): number {
         const keepType = p3 as 'kh' | 'kl' | undefined;
         const keepCountRaw = p4;
         const keepCount = keepCountRaw === '' ? (keepType ? 1 : undefined) : parseInt(keepCountRaw);
-        
+
         let type: DiceType | null = null;
         if (sides === 2) type = 'd2';
         else if (sides === 4) type = 'd4';
@@ -1119,7 +1182,6 @@ if (formulaInput) {
     });
 }
 
-
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -1136,19 +1198,19 @@ function updateDiceResults() {
         if (dice.body.sleepState === CANNON.Body.SLEEPING) {
             if (!dice.isSettled) {
                 dice.isSettled = true;
-                
+
                 // Determine which face is up
                 let maxDot = -Infinity;
                 let minDot = Infinity;
                 let bestFaceValue = 0;
-                
+
                 const worldQuat = new THREE.Quaternion(
                     dice.body.quaternion.x,
                     dice.body.quaternion.y,
                     dice.body.quaternion.z,
                     dice.body.quaternion.w
                 );
-                
+
                 for (const face of dice.faces) {
                     const worldNormal = face.normal.clone().applyQuaternion(worldQuat);
                     if (dice.type === 'd4') {
@@ -1163,7 +1225,7 @@ function updateDiceResults() {
                         }
                     }
                 }
-                
+
                 dice.currentValue = bestFaceValue;
                 rollsToUpdate.add(dice.rollId);
             }
@@ -1174,29 +1236,29 @@ function updateDiceResults() {
 
     // Update History for completed rolls
     for (const rollId of rollsToUpdate) {
-        const rollDice = diceList.filter(d => d.rollId === rollId);
-        const allSettled = rollDice.every(d => d.isSettled);
-        
+        const rollDice = diceList.filter((d) => d.rollId === rollId);
+        const allSettled = rollDice.every((d) => d.isSettled);
+
         if (allSettled) {
-            const record = rollHistory.find(r => r.id === rollId);
+            const record = rollHistory.find((r) => r.id === rollId);
             if (record && record.result === null) {
                 const groupValues: number[] = [];
-                
+
                 record.groups.forEach((group, groupIdx) => {
-                    const groupDice = rollDice.filter(d => d.groupIndex === groupIdx);
-                    
+                    const groupDice = rollDice.filter((d) => d.groupIndex === groupIdx);
+
                     // Group dice by logicalIndex (relevant for d100)
                     const logicalDieResults: number[] = [];
                     const logicalGroups = new Map<number, Dice[]>();
-                    groupDice.forEach(d => {
+                    groupDice.forEach((d) => {
                         if (!logicalGroups.has(d.logicalIndex)) logicalGroups.set(d.logicalIndex, []);
                         logicalGroups.get(d.logicalIndex)!.push(d);
                     });
-                    
+
                     logicalGroups.forEach((dicePair) => {
                         if (dicePair[0].type === 'd100') {
-                            const tens = dicePair.find(d => d.isTens)?.currentValue || 0;
-                            const units = dicePair.find(d => !d.isTens)?.currentValue || 0;
+                            const tens = dicePair.find((d) => d.isTens)?.currentValue || 0;
+                            const units = dicePair.find((d) => !d.isTens)?.currentValue || 0;
                             let res = tens + units;
                             if (tens === 0 && units === 0) res = 100;
                             logicalDieResults.push(res);
@@ -1206,7 +1268,7 @@ function updateDiceResults() {
                             logicalDieResults.push(val);
                         }
                     });
-                    
+
                     // Apply kh/kl logic
                     let keptResults = [...logicalDieResults];
                     if (group.keepType && group.keepCount !== undefined) {
@@ -1217,16 +1279,16 @@ function updateDiceResults() {
                         }
                         keptResults = keptResults.slice(0, group.keepCount);
                     }
-                    
+
                     record.groupResults[groupIdx] = keptResults;
                     groupValues.push(keptResults.reduce((a, b) => a + b, 0));
                 });
-                
+
                 const evalFormula = record.template.replace(/__G(\d+)__/g, (_, idxStr) => {
                     const idx = parseInt(idxStr);
                     return groupValues[idx].toString();
                 });
-                
+
                 record.result = evaluateMath(evalFormula);
                 updateHistoryUI();
                 saveState();
@@ -1241,23 +1303,28 @@ function saveState() {
         nextRollId,
         camera: {
             position: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
-            target: { x: controls.target.x, y: controls.target.y, z: controls.target.z }
+            target: { x: controls.target.x, y: controls.target.y, z: controls.target.z },
         },
-        dice: diceList.map(d => ({
+        dice: diceList.map((d) => ({
             type: d.type,
             rollId: d.rollId,
             groupIndex: d.groupIndex,
             logicalIndex: d.logicalIndex,
             isTens: d.isTens,
             position: { x: d.body.position.x, y: d.body.position.y, z: d.body.position.z },
-            quaternion: { x: d.body.quaternion.x, y: d.body.quaternion.y, z: d.body.quaternion.z, w: d.body.quaternion.w },
+            quaternion: {
+                x: d.body.quaternion.x,
+                y: d.body.quaternion.y,
+                z: d.body.quaternion.z,
+                w: d.body.quaternion.w,
+            },
             velocity: { x: d.body.velocity.x, y: d.body.velocity.y, z: d.body.velocity.z },
             angularVelocity: { x: d.body.angularVelocity.x, y: d.body.angularVelocity.y, z: d.body.angularVelocity.z },
             color: (d.mesh.material as THREE.MeshPhysicalMaterial).color.getHex(),
             currentValue: d.currentValue,
             isSettled: d.isSettled,
-            hasEnteredTray: d.hasEnteredTray
-        }))
+            hasEnteredTray: d.hasEnteredTray,
+        })),
     };
     localStorage.setItem('d20_state', JSON.stringify(state));
 }
@@ -1282,11 +1349,20 @@ function loadState() {
         }
         if (state.dice) {
             for (const dState of state.dice) {
-                createDice(dState.type, dState.rollId, dState.isTens, dState.groupIndex, dState.logicalIndex, 0, 1, dState);
+                createDice(
+                    dState.type,
+                    dState.rollId,
+                    dState.isTens,
+                    dState.groupIndex,
+                    dState.logicalIndex,
+                    0,
+                    1,
+                    dState
+                );
             }
         }
     } catch (e) {
-        console.error("Failed to load state", e);
+        console.error('Failed to load state', e);
     }
 }
 
