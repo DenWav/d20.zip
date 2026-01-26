@@ -1,0 +1,19 @@
+{
+  "name": "d20.zip",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npx serve ."
+  },
+  "dependencies": {
+    "cannon-es": "^0.20.0",
+    "three": "^0.182.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.182.0",
+    "typescript": "^5.5.3"
+  },
+  "private": true
+}

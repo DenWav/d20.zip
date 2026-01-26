@@ -1,0 +1,1301 @@
+import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { World } from './physics.js';
+import { getD2, getD4, getCube, getD8, getD10, getD12, getD20 } from './geometry.js';
+
+const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x222222);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 25, 15);
+camera.lookAt(0, 0, 0);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.screenSpacePanning = false;
+
+// Lights
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); // Reduced from 0.6
+scene.add(ambientLight);
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); // Increased from 1.0
+directionalLight.position.set(10, 20, 10);
+directionalLight.castShadow = true;
+directionalLight.shadow.camera.left = -15;
+directionalLight.shadow.camera.right = 15;
+directionalLight.shadow.camera.top = 15;
+directionalLight.shadow.camera.bottom = -15;
+directionalLight.shadow.mapSize.width = 1024;
+directionalLight.shadow.mapSize.height = 1024;
+scene.add(directionalLight);
+
+// Secondary light for more depth
+const fillLight = new THREE.DirectionalLight(0x446688, 0.5);
+fillLight.position.set(-10, 10, -10);
+scene.add(fillLight);
+
+// Environment setup
+const pmremGenerator = new THREE.PMREMGenerator(renderer);
+pmremGenerator.compileEquirectangularShader();
+
+// Create a simple procedural environment map (gradient)
+function createEnvironmentMap() {
+    const scene = new THREE.Scene();
+    const geom = new THREE.SphereGeometry(1, 64, 32);
+    const mat = new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        uniforms: {
+            topColor: { value: new THREE.Color(0x333333) },
+            bottomColor: { value: new THREE.Color(0x111111) },
+            offset: { value: 33 },
+            exponent: { value: 0.6 }
+        },
+        vertexShader: `
+            varying vec3 vWorldPosition;
+            void main() {
+                vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                vWorldPosition = worldPosition.xyz;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            varying vec3 vWorldPosition;
+            uniform vec3 topColor;
+            uniform vec3 bottomColor;
+            uniform float offset;
+            uniform float exponent;
+            void main() {
+                float h = normalize(vWorldPosition + offset).y;
+                gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
+            }
+        `
+    });
+    const mesh = new THREE.Mesh(geom, mat);
+    scene.add(mesh);
+    
+    // Add some random bright points to the env map for highlights
+    for (let i = 0; i < 6; i++) {
+        const light = new THREE.PointLight(0xffffff, 20);
+        light.position.set(
+            (Math.random() - 0.5) * 2,
+            Math.random() * 2,
+            (Math.random() - 0.5) * 2
+        );
+        scene.add(light);
+    }
+
+    const renderTarget = pmremGenerator.fromScene(scene);
+    return renderTarget.texture;
+}
+
+scene.environment = createEnvironmentMap();
+
+// Physics World
+const world = new World();
+
+// --- Dice Number Texture ---
+function createDiceTexture() {
+    const canvas = document.createElement('canvas');
+    // Double resolution for better sharpness
+    canvas.width = 2048;
+    canvas.height = 3072; // 10 x 15 grid
+    const ctx = canvas.getContext('2d')!;
+    
+    // Base color
+    ctx.fillStyle = '#eeeeee';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Subtle Marble/Granite Texture
+    // Layer 1: Larger speckles
+    for (let i = 0; i < 5000; i++) {
+        const opacity = 0.2 + Math.random() * 0.3;
+        ctx.fillStyle = Math.random() > 0.5 ? `rgba(0,0,0,${opacity})` : `rgba(255,255,255,${opacity})`;
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const s = 4 + Math.random() * 6;
+        ctx.fillRect(x, y, s, s);
+    }
+
+    // Layer 2: Fine dust particles
+    for (let i = 0; i < 25000; i++) {
+        const opacity = 0.2 + Math.random() * 0.4;
+        ctx.fillStyle = Math.random() > 0.5 ? `rgba(0,0,0,${opacity})` : `rgba(255,255,255,${opacity})`;
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const s = 2 + Math.random() * 2;
+        ctx.fillRect(x, y, s, s);
+    }
+
+    const gridSize = 10;
+    const cellSize = 2048 / gridSize;
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // Base font size (scaled for 2048 resolution)
+    ctx.font = 'bold 80px Arial';
+    ctx.fillStyle = '#222222';
+    
+    // Add shadow blur to create a gradient for the bump map (the "bevel")
+    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    ctx.shadowBlur = 2;
+
+    const verticalOffset = 12;
+
+    // 1-100
+    for (let i = 0; i < 100; i++) {
+        const x = (i % gridSize) * cellSize + cellSize / 2;
+        const y = Math.floor(i / gridSize) * cellSize + cellSize / 2;
+        ctx.fillText((i + 1).toString(), x, y + verticalOffset);
+    }
+
+    // 00-90 for D100 tens
+    ctx.font = 'bold 65px Arial';
+    for (let i = 0; i < 10; i++) {
+        const x = (i % gridSize) * cellSize + cellSize / 2;
+        const y = (10 + Math.floor(i / gridSize)) * cellSize + cellSize / 2;
+        ctx.fillText((i * 10).toString().padStart(2, '0'), x, y + verticalOffset);
+    }
+    
+    // 0-9 for D10 (often 0-9 instead of 1-10)
+    ctx.font = 'bold 80px Arial';
+    for (let i = 0; i < 10; i++) {
+        const x = (i % gridSize) * cellSize + cellSize / 2;
+        const y = (11 + Math.floor(i / gridSize)) * cellSize + cellSize / 2;
+        ctx.fillText(i.toString(), x, y + verticalOffset);
+    }
+
+    // D4 special cells in row 12
+    ctx.font = 'bold 45px Arial';
+    const d4Faces = [
+        [2, 4, 3],
+        [1, 3, 4],
+        [1, 4, 2],
+        [1, 2, 3]
+    ];
+    const vPos = [
+        { x: 0.5, y: 0.2304 },
+        { x: 0.2, y: 0.75 },
+        { x: 0.8, y: 0.75 }
+    ];
+    const vCenter = { x: 0.5, y: 0.5768 };
+
+    for (let i = 0; i < 4; i++) {
+        const xBase = i * cellSize;
+        const yBase = 12 * cellSize;
+        const nums = d4Faces[i];
+        
+        nums.forEach((num, j) => {
+            const v = vPos[j];
+            const dx = v.x - vCenter.x;
+            const dy = v.y - vCenter.y;
+            
+            // Move 50% from vertex towards center for legibility
+            const pX = vCenter.x + dx * 0.5;
+            const pY = vCenter.y + dy * 0.5;
+            
+            // Rotate so "up" points towards vertex
+            const angle = Math.atan2(dy, dx) + Math.PI / 2;
+            
+            ctx.save();
+            ctx.translate(xBase + pX * cellSize, yBase + pY * cellSize);
+            ctx.rotate(angle);
+            ctx.fillText(num.toString(), 0, 0);
+            ctx.restore();
+        });
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.anisotropy = 16;
+    texture.magFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    return texture;
+}
+
+function createFeltTexture() {
+    const canvas = document.createElement('canvas');
+    const size = 512;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+
+    // Slightly darker base to allow light fibers to show up
+    ctx.fillStyle = '#e0e0e0';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const drawSeamless = (x: number, y: number, radius: number, drawFn: (ox: number, oy: number) => void) => {
+        for (let ox = -1; ox <= 1; ox++) {
+            for (let oy = -1; oy <= 1; oy++) {
+                const dx = ox * size;
+                const dy = oy * size;
+                // Only draw if the element could potentially be visible on the canvas at this offset
+                if (x + dx + radius > 0 && x + dx - radius < size && y + dy + radius > 0 && y + dy - radius < size) {
+                    drawFn(dx, dy);
+                }
+            }
+        }
+    };
+
+    // Add fiber noise - more fibers, more opaque, slightly larger
+    for (let i = 0; i < 60000; i++) {
+        const x = Math.random() * size;
+        const y = Math.random() * size;
+        const len = Math.random() * 8 + 2;
+        const angle = Math.random() * Math.PI * 2;
+        const opacity = Math.random() * 0.4;
+        const color = Math.random() > 0.5 ? `rgba(255,255,255,${opacity})` : `rgba(0,0,0,${opacity})`;
+        const lineWidth = Math.random() * 0.8 + 0.4;
+        
+        const dx = Math.cos(angle) * len;
+        const dy = Math.sin(angle) * len;
+
+        drawSeamless(x, y, len, (ox, oy) => {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = lineWidth;
+            ctx.beginPath();
+            ctx.moveTo(x + ox, y + oy);
+            ctx.lineTo(x + ox + dx, y + oy + dy);
+            ctx.stroke();
+        });
+    }
+
+    // Add more noticeable organic splotches
+    for (let i = 0; i < 40; i++) {
+        const x = Math.random() * size;
+        const y = Math.random() * size;
+        const radius = Math.random() * 100 + 50;
+        const opacity = Math.random() * 0.15;
+        const colorStop = Math.random() > 0.5 ? `rgba(255,255,255,${opacity})` : `rgba(0,0,0,${opacity})`;
+
+        drawSeamless(x, y, radius, (ox, oy) => {
+            const grd = ctx.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, radius);
+            grd.addColorStop(0, colorStop);
+            grd.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grd;
+            ctx.fillRect(x + ox - radius, y + oy - radius, radius * 2, radius * 2);
+        });
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.anisotropy = 16;
+    // Repeat for finer detail
+    texture.repeat.set(2, 2); // Reduced from 4 to make it less obviously tiling
+    return texture;
+}
+
+const diceTexture = createDiceTexture();
+const feltTexture = createFeltTexture();
+
+// --- UV Mapping and Face Detection ---
+interface FaceInfo {
+    normal: THREE.Vector3;
+    value: number;
+}
+
+function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = false): FaceInfo[] {
+    const pos = geometry.getAttribute('position');
+    const uvs = new Float32Array(pos.count * 2);
+    const faces: FaceInfo[] = [];
+
+    const gridSize = 10;
+    const gridHeight = 15;
+    
+    // Group triangles by normal
+    const uniqueNormals: THREE.Vector3[] = [];
+    const normalGroups: number[][] = [];
+
+    for (let i = 0; i < pos.count; i += 3) {
+        const v1 = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+        const v2 = new THREE.Vector3(pos.getX(i + 1), pos.getY(i + 1), pos.getZ(i + 1));
+        const v3 = new THREE.Vector3(pos.getX(i + 2), pos.getY(i + 2), pos.getZ(i + 2));
+        
+        const normal = new THREE.Vector3().crossVectors(
+            v2.clone().sub(v1),
+            v3.clone().sub(v1)
+        ).normalize();
+        
+        let foundIndex = -1;
+        for (let j = 0; j < uniqueNormals.length; j++) {
+            // Use dot product to group nearly-coplanar triangles (important for D10)
+            if (uniqueNormals[j].dot(normal) > 0.99) {
+                foundIndex = j;
+                break;
+            }
+        }
+
+        if (foundIndex === -1) {
+            foundIndex = uniqueNormals.length;
+            uniqueNormals.push(normal);
+            normalGroups.push([]);
+        }
+        normalGroups[foundIndex].push(i);
+    }
+
+    // Sort to have consistent mapping (highest Y first)
+    const sortedIndices = uniqueNormals.map((_, i) => i).sort((i, j) => {
+        const a = uniqueNormals[i];
+        const b = uniqueNormals[j];
+        // Sort by Y, then Z, then X with small epsilon
+        const eps = 0.01;
+        if (Math.abs(b.y - a.y) > eps) return b.y - a.y;
+        if (Math.abs(b.z - a.z) > eps) return b.z - a.z;
+        return b.x - a.x;
+    });
+
+    let baseRow = 0;
+    let valueMultiplier = 1;
+    let valueOffset = 1;
+
+    if (type === 'd10' || type === 'd100') {
+        if (isTens) {
+            baseRow = 10;
+            valueMultiplier = 10;
+            valueOffset = 0;
+        } else {
+            baseRow = 11;
+            valueMultiplier = 1;
+            valueOffset = 0;
+        }
+    }
+
+    if (type === 'd2') {
+        sortedIndices.forEach((normalIndex) => {
+            const normal = uniqueNormals[normalIndex];
+            const triangleIndices = normalGroups[normalIndex];
+            
+            let value = 0;
+            if (normal.y > 0.9) value = 1;
+            else if (normal.y < -0.9) value = 2;
+            
+            if (value > 0) {
+                faces.push({ normal, value });
+                const col = (value - 1) % gridSize;
+                const row = Math.floor((value - 1) / gridSize);
+                const uMin = col / gridSize;
+                const uMax = (col + 1) / gridSize;
+                const vMin = 1 - (row + 1) / gridHeight;
+                const vMax = 1 - row / gridHeight;
+
+                const t = new THREE.Vector3(-1, 0, 0);
+                const bt = new THREE.Vector3(0, 0, 1);
+                if (normal.y < 0) t.set(1, 0, 0); // Flip for bottom face
+
+                for (const i of triangleIndices) {
+                    for (let j = 0; j < 3; j++) {
+                        const v = new THREE.Vector3(pos.getX(i + j), pos.getY(i + j), pos.getZ(i + j));
+                        const uu = v.dot(t) * 0.5 + 0.5;
+                        const vv = v.dot(bt) * 0.5 + 0.5;
+                        uvs[(i + j) * 2] = uMin + uu * (uMax - uMin);
+                        uvs[(i + j) * 2 + 1] = vMin + vv * (vMax - vMin);
+                    }
+                }
+            }
+        });
+        geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+        return faces;
+    }
+
+    if (type === 'd4') {
+        const d4FaceSets = [
+            [2, 4, 3], [1, 3, 4], [1, 4, 2], [1, 2, 3]
+        ];
+        const uniqueVertices: THREE.Vector3[] = [];
+        for (let i = 0; i < pos.count; i++) {
+            const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+            let found = false;
+            for (const uv of uniqueVertices) {
+                if (uv.distanceTo(v) < 0.01) { found = true; break; }
+            }
+            if (!found) uniqueVertices.push(v);
+        }
+        uniqueVertices.sort((a, b) => {
+            if (Math.abs(a.y - b.y) > 0.01) return a.y - b.y;
+            if (Math.abs(a.z - b.z) > 0.01) return a.z - b.z;
+            return a.x - b.x;
+        });
+
+        sortedIndices.forEach((normalIndex) => {
+            const normal = uniqueNormals[normalIndex];
+            const triangleIndices = normalGroups[normalIndex];
+            const i0 = triangleIndices[0];
+            
+            const bVals: number[] = [];
+            for (let j = 0; j < 3; j++) {
+                const v = new THREE.Vector3(pos.getX(i0 + j), pos.getY(i0 + j), pos.getZ(i0 + j));
+                for (let k = 0; k < 4; k++) {
+                    if (v.distanceTo(uniqueVertices[k]) < 0.01) {
+                        bVals.push(k + 1);
+                        break;
+                    }
+                }
+            }
+
+            let atlasCol = -1;
+            let shift = 0;
+            for (let col = 0; col < 4; col++) {
+                const atlasVals = d4FaceSets[col];
+                for (let s = 0; s < 3; s++) {
+                    if (atlasVals[0] === bVals[s] && atlasVals[1] === bVals[(s + 1) % 3] && atlasVals[2] === bVals[(s + 2) % 3]) {
+                        atlasCol = col;
+                        shift = s;
+                        break;
+                    }
+                }
+                if (atlasCol !== -1) break;
+            }
+
+            faces.push({ normal, value: atlasCol + 1 });
+
+            const uMin = atlasCol / gridSize;
+            const uMax = (atlasCol + 1) / gridSize;
+            const vMin = 1 - (12 + 1) / gridHeight;
+            const vMax = 1 - 12 / gridHeight;
+
+            const positions = [
+                { x: 0.5, y: 0.2304 },
+                { x: 0.2, y: 0.75 },
+                { x: 0.8, y: 0.75 }
+            ];
+
+            for (const i of triangleIndices) {
+                for (let j = 0; j < 3; j++) {
+                    const p = positions[(j - shift + 3) % 3];
+                    uvs[(i + j) * 2] = uMin + p.x * (uMax - uMin);
+                    uvs[(i + j) * 2 + 1] = vMin + (1 - p.y) * (vMax - vMin);
+                }
+            }
+        });
+        geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+        return faces;
+    }
+
+    sortedIndices.forEach((normalIndex, index) => {
+        const normal = uniqueNormals[normalIndex];
+        const value = index * valueMultiplier + valueOffset;
+        faces.push({ normal, value });
+        
+        const triangleIndices = normalGroups[normalIndex];
+        
+        // Calculate face center
+        const center = new THREE.Vector3();
+        for (const i of triangleIndices) {
+            for (let j = 0; j < 3; j++) {
+                center.add(new THREE.Vector3(pos.getX(i+j), pos.getY(i+j), pos.getZ(i+j)));
+            }
+        }
+        center.divideScalar(triangleIndices.length * 3);
+
+        const col = index % gridSize;
+        const row = baseRow + Math.floor(index / gridSize);
+        
+        const uMin = col / gridSize;
+        const uMax = (col + 1) / gridSize;
+        const vMin = 1 - (row + 1) / gridHeight;
+        const vMax = 1 - row / gridHeight;
+
+        // Consistent local coordinate system for the face
+        let up = new THREE.Vector3(0, 1, 0);
+        if (Math.abs(normal.dot(up)) > 0.9) up.set(0, 0, 1);
+        const tangent = new THREE.Vector3().crossVectors(up, normal).normalize();
+        const bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
+
+        // Find bounding box in local 2D space to scale properly
+        let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+        for (const i of triangleIndices) {
+            for (let j = 0; j < 3; j++) {
+                const v = new THREE.Vector3(pos.getX(i + j), pos.getY(i + j), pos.getZ(i + j)).sub(center);
+                const uu = v.dot(tangent);
+                const vv = v.dot(bitangent);
+                minU = Math.min(minU, uu); maxU = Math.max(maxU, uu);
+                minV = Math.min(minV, vv); maxV = Math.max(maxV, vv);
+            }
+        }
+
+        const width = maxU - minU;
+        const height = maxV - minV;
+        const maxExtent = Math.max(width, height, 0.1);
+        let margin = 1.0;
+        if (type === 'd6') margin = 0.7; // Make D6 numbers larger
+        const scale = margin / maxExtent;
+
+        for (const i of triangleIndices) {
+            for (let j = 0; j < 3; j++) {
+                const vertex = new THREE.Vector3(pos.getX(i + j), pos.getY(i + j), pos.getZ(i + j)).sub(center);
+                
+                const u = vertex.dot(tangent);
+                const v = vertex.dot(bitangent);
+                
+                // Scale and center in UV cell
+                const cellU = u * scale + 0.5;
+                const cellV = v * scale + 0.5;
+                
+                uvs[(i + j) * 2] = uMin + cellU * (uMax - uMin);
+                uvs[(i + j) * 2 + 1] = vMin + cellV * (vMax - vMin);
+            }
+        }
+    });
+
+    geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    return faces;
+}
+
+// Collision groups
+const COLLISION_GROUP_DICE = 1;
+const COLLISION_GROUP_GROUND = 2;
+const COLLISION_GROUP_WALLS = 4;
+
+// Floor & Walls Configuration
+const wallCount = 8;
+const wallLimit = 10;
+const floorThickness = 0.1;
+const wallHeight = 2.0;
+const wallThickness = 0.2;
+const floorRadius = wallLimit / Math.cos(Math.PI / wallCount);
+
+// Floor for visual reference
+const floorMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(floorRadius, floorRadius, floorThickness, wallCount),
+    new THREE.MeshStandardMaterial({ 
+        color: 0x3c69a0, // Adjusted blue to compensate for texture base
+        map: feltTexture,
+        bumpMap: feltTexture,
+        bumpScale: 0.1, // Increased for more visible texture
+        roughness: 0.95,
+        roughnessMap: feltTexture,
+        metalness: 0.0,
+    })
+);
+floorMesh.position.y = -floorThickness / 2;
+floorMesh.rotation.y = Math.PI / wallCount;
+floorMesh.receiveShadow = true;
+scene.add(floorMesh);
+
+// Floor Physics
+const floorBody = new CANNON.Body({
+    mass: 0,
+    shape: new CANNON.Plane(),
+    collisionFilterGroup: COLLISION_GROUP_GROUND,
+    collisionFilterMask: COLLISION_GROUP_DICE
+});
+floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+world.addBody(floorBody);
+
+// Visual Walls & Physics Walls
+const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.5 });
+const wallSideLength = 2 * floorRadius * Math.sin(Math.PI / wallCount);
+const wallGeom = new THREE.BoxGeometry(wallSideLength, wallHeight, wallThickness);
+
+const physicsWallThickness = 2.0;
+const physicsWallHeight = 150.0; // Much taller physics walls to prevent escape
+
+for (let i = 0; i < wallCount; i++) {
+    const angle = (i * 2 * Math.PI) / wallCount;
+    const x = Math.cos(angle) * wallLimit;
+    const z = Math.sin(angle) * wallLimit;
+    
+    // Visual wall
+    const wallMesh = new THREE.Mesh(wallGeom, wallMaterial);
+    wallMesh.position.set(x, wallHeight / 2 - floorThickness, z);
+    wallMesh.rotation.y = Math.PI / 2 - angle;
+    wallMesh.castShadow = true;
+    wallMesh.receiveShadow = true;
+    scene.add(wallMesh);
+    
+    // Physics wall (Thicker box to prevent clipping)
+    // We want the inner face to match the visual wall's inner face.
+    // Visual inner face distance = wallLimit - wallThickness / 2
+    // Physics center distance = (wallLimit - wallThickness / 2) + physicsWallThickness / 2
+    const physicsCenterDist = (wallLimit - wallThickness / 2) + physicsWallThickness / 2;
+    const px = Math.cos(angle) * physicsCenterDist;
+    const pz = Math.sin(angle) * physicsCenterDist;
+
+    const body = new CANNON.Body({ 
+        mass: 0, 
+        shape: new CANNON.Box(new CANNON.Vec3(wallSideLength / 2 + 1.0, physicsWallHeight / 2, physicsWallThickness / 2)),
+        collisionFilterGroup: COLLISION_GROUP_WALLS,
+        collisionFilterMask: COLLISION_GROUP_DICE
+    });
+    body.position.set(px, physicsWallHeight / 2 - floorThickness, pz);
+    body.quaternion.copy(wallMesh.quaternion as any);
+    world.addBody(body);
+}
+
+interface Dice {
+    body: CANNON.Body;
+    mesh: THREE.Mesh;
+    type: DiceType;
+    faces: FaceInfo[];
+    currentValue: number | null;
+    isSettled: boolean;
+    hasEnteredTray: boolean;
+    rollId: number;
+    groupIndex: number;
+    logicalIndex: number; // for d100, both physical dice share same logicalIndex
+    isTens?: boolean;
+}
+
+const diceList: Dice[] = [];
+let nextRollId = 0;
+
+interface RollGroup {
+    type: DiceType;
+    count: number;
+    keepType?: 'kh' | 'kl';
+    keepCount?: number;
+}
+
+interface RollRecord {
+    id: number;
+    formula: string;
+    template: string;
+    result: number | null;
+    groups: RollGroup[];
+    groupResults: number[][]; // Store actual values for each group
+}
+const rollHistory: RollRecord[] = [];
+const maxHistory = 20;
+
+function formatBreakdown(record: RollRecord): string {
+    if (record.result === null) return 'Rolling...';
+    
+    return record.template.replace(/__G(\d+)__/g, (_, idxStr) => {
+        const idx = parseInt(idxStr);
+        const vals = record.groupResults[idx];
+        if (!vals) return '?';
+        if (vals.length > 1) {
+            return `(${vals.join(' + ')})`;
+        } else {
+            return vals[0].toString();
+        }
+    });
+}
+
+function updateHistoryUI() {
+    const historyListEl = document.getElementById('history-list');
+    if (historyListEl) {
+        historyListEl.innerHTML = rollHistory.map((record) => `
+            <div class="history-item">
+                <div class="history-header">
+                    <span>${record.formula}</span>
+                    <span class="history-result">${record.result !== null ? record.result : '...'}</span>
+                </div>
+                ${record.result !== null ? `<div class="history-breakdown">${formatBreakdown(record)}</div>` : ''}
+                <button class="re-roll-btn" onclick="window.reRollById(${record.id})">Re-roll</button>
+            </div>
+        `).join('');
+    }
+
+    const latestResultEl = document.getElementById('latest-result');
+    if (latestResultEl) {
+        if (rollHistory.length > 0 && rollHistory[0].result !== null) {
+            latestResultEl.innerText = rollHistory[0].result.toString();
+        } else {
+            latestResultEl.innerText = '';
+        }
+    }
+}
+
+function addToHistory(formula: string, template: string, id: number, groups: RollGroup[]) {
+    rollHistory.unshift({ id, formula, template, result: null, groups, groupResults: [] });
+    if (rollHistory.length > maxHistory) {
+        rollHistory.pop();
+    }
+    updateHistoryUI();
+    saveState();
+}
+
+(window as any).reRollById = (id: number) => {
+    const record = rollHistory.find(r => r.id === id);
+    if (record) {
+        (window as any).rollFormula(record.formula);
+    }
+};
+
+// ... keep createConvexPolyhedron ...
+
+function createConvexPolyhedron(geometry: THREE.BufferGeometry) {
+    const position = geometry.getAttribute('position');
+    const vertices: CANNON.Vec3[] = [];
+    const faces: number[][] = [];
+    
+    for (let i = 0; i < position.count; i += 3) {
+        const face: number[] = [];
+        for (let j = 0; j < 3; j++) {
+            const vx = position.getX(i + j);
+            const vy = position.getY(i + j);
+            const vz = position.getZ(i + j);
+            
+            let index = -1;
+            for (let k = 0; k < vertices.length; k++) {
+                if (Math.abs(vertices[k].x - vx) < 0.01 && 
+                    Math.abs(vertices[k].y - vy) < 0.01 && 
+                    Math.abs(vertices[k].z - vz) < 0.01) {
+                    index = k;
+                    break;
+                }
+            }
+            if (index === -1) {
+                index = vertices.length;
+                vertices.push(new CANNON.Vec3(vx, vy, vz));
+            }
+            face.push(index);
+        }
+        faces.push(face);
+    }
+    return new CANNON.ConvexPolyhedron({ vertices, faces });
+}
+
+type DiceType = 'd2' | 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'd100';
+
+function createDice(type: DiceType, rollId: number, isTens = false, groupIndex = 0, logicalIndex = 0, indexInRoll = 0, totalInRoll = 1, initialState?: any) {
+    let geometry: THREE.BufferGeometry;
+    let shape: CANNON.Shape;
+
+    switch(type) {
+        case 'd2': geometry = getD2(); break;
+        case 'd4': geometry = getD4(); break;
+        case 'd6': geometry = getCube(); break;
+        case 'd8': geometry = getD8(); break;
+        case 'd10': case 'd100': geometry = getD10(); break;
+        case 'd12': geometry = getD12(); break;
+        case 'd20': geometry = getD20(); break;
+        default: geometry = getCube();
+    }
+
+    const faces = applyDiceUVs(geometry, type, isTens);
+
+    if (type === 'd6') {
+        shape = new CANNON.Box(new CANNON.Vec3(0.4, 0.4, 0.4)); // Half-extents
+    } else {
+        shape = createConvexPolyhedron(geometry);
+    }
+    
+    const diceColor = initialState?.color ? new THREE.Color(initialState.color) : new THREE.Color().setHSL(Math.random(), 0.4, 0.5);
+    const material = new THREE.MeshPhysicalMaterial({ 
+        color: diceColor,
+        roughness: 0.75, // Slightly reduced for more reactive highlights
+        metalness: 0.1, // Slight metalness for sharper specular
+        map: diceTexture,
+        bumpMap: diceTexture,
+        bumpScale: 0.1,
+        roughnessMap: diceTexture,
+        transmission: 0.2, // Slightly increased
+        thickness: 1.0,
+        ior: 1.52, // Glass IOR
+        transparent: true,
+        opacity: 0.98,
+        envMapIntensity: 1.5 // Boost environment reflections
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+
+    const body = new CANNON.Body({
+        mass: 15,
+        linearDamping: 0.1,
+        angularDamping: 0.1,
+        allowSleep: true,
+        sleepSpeedLimit: 0.2,
+        sleepTimeLimit: 1.0,
+        collisionFilterGroup: COLLISION_GROUP_DICE,
+        collisionFilterMask: COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND
+    });
+
+    body.addShape(shape);
+    
+    let hasEnteredTray = false;
+    if (initialState) {
+        body.position.set(initialState.position.x, initialState.position.y, initialState.position.z);
+        body.quaternion.set(initialState.quaternion.x, initialState.quaternion.y, initialState.quaternion.z, initialState.quaternion.w);
+        body.velocity.set(initialState.velocity.x, initialState.velocity.y, initialState.velocity.z);
+        body.angularVelocity.set(initialState.angularVelocity.x, initialState.angularVelocity.y, initialState.angularVelocity.z);
+        
+        mesh.position.copy(body.position as any);
+        mesh.quaternion.copy(body.quaternion as any);
+
+        hasEnteredTray = initialState.hasEnteredTray;
+    } else {
+        // Scale spread from 0 (at 4 dice) to 2*PI (at 20 dice)
+        const spread = Math.max(0, Math.min(1, (totalInRoll - 4) / 16)) * Math.PI * 2;
+        
+        // Throw from an angle relative to camera (only horizontal angle)
+        let finalAngle = controls.getAzimuthalAngle();
+        
+        if (totalInRoll > 1 && spread > 0) {
+            // Center the spread on azAngle
+            const offset = (indexInRoll / (totalInRoll - 1) - 0.5) * spread;
+            finalAngle += offset;
+        } else if (totalInRoll > 1) {
+            // Small jitter even if no spread, to avoid stacking exactly in the same line
+            finalAngle += (Math.random() - 0.5) * 0.2;
+        }
+
+        const spawnDistance = wallLimit * 1.4;
+        const spawnPos = new THREE.Vector3(
+            Math.sin(finalAngle) * spawnDistance,
+            8.0 + Math.random() * 4.0,
+            Math.cos(finalAngle) * spawnDistance
+        );
+        
+        // Add some random spread to spawn position (smaller now as we have intentional spread)
+        spawnPos.x += (Math.random() - 0.5) * 2;
+        spawnPos.z += (Math.random() - 0.5) * 2;
+        
+        body.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
+        mesh.position.copy(spawnPos);
+        
+        if (type === 'd2') {
+            // Coin starts flat (since we aligned the shape to Y axis)
+            body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), Math.random() * Math.PI * 2);
+        } else {
+            const axis = new THREE.Vector3(Math.random(), Math.random(), Math.random()).normalize();
+            const rotAngle = Math.random() * Math.PI * 2;
+            body.quaternion.setFromAxisAngle(new CANNON.Vec3(axis.x, axis.y, axis.z), rotAngle);
+        }
+        mesh.quaternion.copy(body.quaternion as any);
+        
+        // Velocity: towards the center area
+        const throwTarget = new THREE.Vector3(
+            (Math.random() - 0.5) * wallLimit * 0.5,
+            0,
+            (Math.random() - 0.5) * wallLimit * 0.5
+        );
+        
+        // Calculate horizontal direction only
+        const horizontalDir = new THREE.Vector3().subVectors(throwTarget, spawnPos);
+        horizontalDir.y = 0;
+        horizontalDir.normalize();
+        
+        const speed = 15 + Math.random() * 10;
+        const velVec = horizontalDir.clone().multiplyScalar(speed);
+        
+        if (type === 'd2') {
+            // Coin flip: significant upward velocity
+            velVec.y = 15 + Math.random() * 10;
+            // Slightly less horizontal speed to keep it more centered during the flip
+            velVec.x *= 0.8;
+            velVec.z *= 0.8;
+        } else {
+            // Slight upward arc for the throw
+            velVec.y = 2 + Math.random() * 6; 
+        }
+        
+        body.velocity.set(velVec.x, velVec.y, velVec.z);
+        
+        // Ensure significant initial rotation (tumbling)
+        if (type === 'd2') {
+            // Flip the coin around a horizontal axis perpendicular to its movement
+            const flipAxis = new THREE.Vector3(-horizontalDir.z, 0, horizontalDir.x);
+            const flipSpeed = 100 + Math.random() * 50;
+            body.angularVelocity.set(
+                flipAxis.x * flipSpeed + (Math.random() - 0.5) * 10,
+                (Math.random() - 0.5) * 20, // some side wobble
+                flipAxis.z * flipSpeed + (Math.random() - 0.5) * 10
+            );
+        } else {
+            body.angularVelocity.set(
+                (Math.random() - 0.5) * 40, 
+                (Math.random() - 0.5) * 40, 
+                (Math.random() - 0.5) * 40
+            );
+        }
+
+        const distSq = spawnPos.x * spawnPos.x + spawnPos.z * spawnPos.z;
+        // Turn on wall collisions only if spawned safely inside (away from walls)
+        hasEnteredTray = distSq < (wallLimit - 1.0) * (wallLimit - 1.0);
+    }
+
+    if (hasEnteredTray) {
+        body.collisionFilterMask = COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND | COLLISION_GROUP_WALLS;
+    }
+
+    world.addBody(body);
+    diceList.push({ 
+        body, 
+        mesh, 
+        type, 
+        faces, 
+        currentValue: initialState ? initialState.currentValue : null, 
+        isSettled: initialState ? initialState.isSettled : false, 
+        hasEnteredTray,
+        rollId,
+        groupIndex,
+        logicalIndex,
+        isTens
+    });
+}
+
+function evaluateMath(expr: string): number {
+    const tokens = expr.match(/\d+\.?\d*|[+\-*/()]/g) || [];
+    const values: number[] = [];
+    const ops: string[] = [];
+
+    const precedence: { [key: string]: number } = {
+        '+': 1, '-': 1,
+        '*': 2, '/': 2
+    };
+
+    const applyOp = () => {
+        if (values.length < 2) return;
+        const op = ops.pop()!;
+        const b = values.pop()!;
+        const a = values.pop()!;
+        switch (op) {
+            case '+': values.push(a + b); break;
+            case '-': values.push(a - b); break;
+            case '*': values.push(a * b); break;
+            case '/': 
+                const res = a / b;
+                values.push(Math.round(res * 10) / 10); 
+                break;
+        }
+    };
+
+    for (let i = 0; i < tokens.length; i++) {
+        const t = tokens[i];
+        if (!isNaN(parseFloat(t))) {
+            values.push(parseFloat(t));
+        } else if (t === '(') {
+            ops.push(t);
+        } else if (t === ')') {
+            while (ops.length && ops[ops.length - 1] !== '(') {
+                applyOp();
+            }
+            ops.pop(); 
+        } else {
+            while (ops.length && ops[ops.length - 1] !== '(' && precedence[ops[ops.length - 1]] >= precedence[t]) {
+                applyOp();
+            }
+            ops.push(t);
+        }
+    }
+
+    while (ops.length) {
+        applyOp();
+    }
+
+    return values[0] || 0;
+}
+
+(window as any).rollDice = (type?: DiceType) => {
+    const types: DiceType[] = ['d2', 'd4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100'];
+    const selectedType = type || types[Math.floor(Math.random() * types.length)];
+    (window as any).rollFormula(selectedType);
+};
+
+(window as any).clearDice = () => {
+    for (const dice of diceList) {
+        scene.remove(dice.mesh);
+        world.cannonWorld.removeBody(dice.body);
+    }
+    diceList.length = 0;
+    saveState();
+};
+
+(window as any).clearHistory = () => {
+    rollHistory.length = 0;
+    updateHistoryUI();
+    saveState();
+};
+
+(window as any).clearAndRoll = (formula: string) => {
+    (window as any).clearDice();
+    (window as any).rollFormula(formula);
+};
+
+(window as any).toggleHistory = () => {
+    const history = document.getElementById('history');
+    if (history) {
+        history.classList.toggle('open');
+    }
+    document.body.classList.toggle('history-open');
+    
+    const hamburger = document.getElementById('hamburger');
+    if (hamburger) {
+        hamburger.innerText = document.body.classList.contains('history-open') ? '✕' : '☰';
+    }
+};
+
+(window as any).rollFormula = (formula: string) => {
+    if (!formula.trim()) return;
+    const rollId = nextRollId++;
+    const groups: RollGroup[] = [];
+    let template = formula.toLowerCase();
+    
+    const diceRegex = /(\d*)d(\d+)(kh|kl)?(\d*)/g;
+    
+    // First pass: count total physical dice
+    let totalPhysicalDice = 0;
+    const matches = Array.from(template.matchAll(diceRegex));
+    for (const match of matches) {
+        const count = match[1] === '' ? 1 : parseInt(match[1]);
+        const sides = parseInt(match[2]);
+        const typeSupported = [2, 4, 6, 8, 10, 12, 20, 100].includes(sides);
+        if (typeSupported) {
+            totalPhysicalDice += (sides === 100 ? count * 2 : count);
+        }
+    }
+
+    let groupCounter = 0;
+    let diceCounter = 0;
+    
+    template = template.replace(diceRegex, (match, p1, p2, p3, p4) => {
+        const groupIndex = groupCounter++;
+        const count = p1 === '' ? 1 : parseInt(p1);
+        const sides = parseInt(p2);
+        const keepType = p3 as 'kh' | 'kl' | undefined;
+        const keepCountRaw = p4;
+        const keepCount = keepCountRaw === '' ? (keepType ? 1 : undefined) : parseInt(keepCountRaw);
+        
+        let type: DiceType | null = null;
+        if (sides === 2) type = 'd2';
+        else if (sides === 4) type = 'd4';
+        else if (sides === 6) type = 'd6';
+        else if (sides === 8) type = 'd8';
+        else if (sides === 10) type = 'd10';
+        else if (sides === 12) type = 'd12';
+        else if (sides === 20) type = 'd20';
+        else if (sides === 100) type = 'd100';
+
+        if (type) {
+            groups.push({ type, count, keepType, keepCount });
+            for (let i = 0; i < count; i++) {
+                if (type === 'd100') {
+                    createDice('d100', rollId, true, groupIndex, i, diceCounter++, totalPhysicalDice);
+                    createDice('d100', rollId, false, groupIndex, i, diceCounter++, totalPhysicalDice);
+                } else {
+                    createDice(type, rollId, false, groupIndex, i, diceCounter++, totalPhysicalDice);
+                }
+            }
+            return `__G${groupIndex}__`;
+        }
+        return match;
+    });
+
+    if (groups.length > 0) {
+        addToHistory(formula, template, rollId, groups);
+    }
+};
+
+const formulaInput = document.getElementById('formula') as HTMLInputElement;
+if (formulaInput) {
+    formulaInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            (window as any).rollFormula(formulaInput.value);
+        }
+    });
+}
+
+
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+let lastTime = 0;
+const fixedStep = 1 / 60;
+
+function updateDiceResults() {
+    const rollsToUpdate = new Set<number>();
+
+    for (const dice of diceList) {
+        if (dice.body.sleepState === CANNON.Body.SLEEPING) {
+            if (!dice.isSettled) {
+                dice.isSettled = true;
+                
+                // Determine which face is up
+                let maxDot = -Infinity;
+                let minDot = Infinity;
+                let bestFaceValue = 0;
+                
+                const worldQuat = new THREE.Quaternion(
+                    dice.body.quaternion.x,
+                    dice.body.quaternion.y,
+                    dice.body.quaternion.z,
+                    dice.body.quaternion.w
+                );
+                
+                for (const face of dice.faces) {
+                    const worldNormal = face.normal.clone().applyQuaternion(worldQuat);
+                    if (dice.type === 'd4') {
+                        if (worldNormal.y < minDot) {
+                            minDot = worldNormal.y;
+                            bestFaceValue = face.value;
+                        }
+                    } else {
+                        if (worldNormal.y > maxDot) {
+                            maxDot = worldNormal.y;
+                            bestFaceValue = face.value;
+                        }
+                    }
+                }
+                
+                dice.currentValue = bestFaceValue;
+                rollsToUpdate.add(dice.rollId);
+            }
+        } else {
+            dice.isSettled = false;
+        }
+    }
+
+    // Update History for completed rolls
+    for (const rollId of rollsToUpdate) {
+        const rollDice = diceList.filter(d => d.rollId === rollId);
+        const allSettled = rollDice.every(d => d.isSettled);
+        
+        if (allSettled) {
+            const record = rollHistory.find(r => r.id === rollId);
+            if (record && record.result === null) {
+                const groupValues: number[] = [];
+                
+                record.groups.forEach((group, groupIdx) => {
+                    const groupDice = rollDice.filter(d => d.groupIndex === groupIdx);
+                    
+                    // Group dice by logicalIndex (relevant for d100)
+                    const logicalDieResults: number[] = [];
+                    const logicalGroups = new Map<number, Dice[]>();
+                    groupDice.forEach(d => {
+                        if (!logicalGroups.has(d.logicalIndex)) logicalGroups.set(d.logicalIndex, []);
+                        logicalGroups.get(d.logicalIndex)!.push(d);
+                    });
+                    
+                    logicalGroups.forEach((dicePair) => {
+                        if (dicePair[0].type === 'd100') {
+                            const tens = dicePair.find(d => d.isTens)?.currentValue || 0;
+                            const units = dicePair.find(d => !d.isTens)?.currentValue || 0;
+                            let res = tens + units;
+                            if (tens === 0 && units === 0) res = 100;
+                            logicalDieResults.push(res);
+                        } else {
+                            logicalDieResults.push(dicePair[0].currentValue || 0);
+                        }
+                    });
+                    
+                    // Apply kh/kl logic
+                    let keptResults = [...logicalDieResults];
+                    if (group.keepType && group.keepCount !== undefined) {
+                        if (group.keepType === 'kh') {
+                            keptResults.sort((a, b) => b - a);
+                        } else {
+                            keptResults.sort((a, b) => a - b);
+                        }
+                        keptResults = keptResults.slice(0, group.keepCount);
+                    }
+                    
+                    record.groupResults[groupIdx] = keptResults;
+                    groupValues.push(keptResults.reduce((a, b) => a + b, 0));
+                });
+                
+                const evalFormula = record.template.replace(/__G(\d+)__/g, (_, idxStr) => {
+                    const idx = parseInt(idxStr);
+                    return groupValues[idx].toString();
+                });
+                
+                record.result = evaluateMath(evalFormula);
+                updateHistoryUI();
+                saveState();
+            }
+        }
+    }
+}
+
+function saveState() {
+    const state = {
+        rollHistory,
+        nextRollId,
+        camera: {
+            position: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+            target: { x: controls.target.x, y: controls.target.y, z: controls.target.z }
+        },
+        dice: diceList.map(d => ({
+            type: d.type,
+            rollId: d.rollId,
+            groupIndex: d.groupIndex,
+            logicalIndex: d.logicalIndex,
+            isTens: d.isTens,
+            position: { x: d.body.position.x, y: d.body.position.y, z: d.body.position.z },
+            quaternion: { x: d.body.quaternion.x, y: d.body.quaternion.y, z: d.body.quaternion.z, w: d.body.quaternion.w },
+            velocity: { x: d.body.velocity.x, y: d.body.velocity.y, z: d.body.velocity.z },
+            angularVelocity: { x: d.body.angularVelocity.x, y: d.body.angularVelocity.y, z: d.body.angularVelocity.z },
+            color: (d.mesh.material as THREE.MeshPhysicalMaterial).color.getHex(),
+            currentValue: d.currentValue,
+            isSettled: d.isSettled,
+            hasEnteredTray: d.hasEnteredTray
+        }))
+    };
+    localStorage.setItem('d20_state', JSON.stringify(state));
+}
+
+function loadState() {
+    const saved = localStorage.getItem('d20_state');
+    if (!saved) return;
+    try {
+        const state = JSON.parse(saved);
+        if (state.nextRollId !== undefined) {
+            nextRollId = state.nextRollId;
+        }
+        if (state.rollHistory) {
+            rollHistory.length = 0;
+            rollHistory.push(...state.rollHistory);
+            updateHistoryUI();
+        }
+        if (state.camera) {
+            camera.position.set(state.camera.position.x, state.camera.position.y, state.camera.position.z);
+            controls.target.set(state.camera.target.x, state.camera.target.y, state.camera.target.z);
+            controls.update();
+        }
+        if (state.dice) {
+            for (const dState of state.dice) {
+                createDice(dState.type, dState.rollId, dState.isTens, dState.groupIndex, dState.logicalIndex, 0, 1, dState);
+            }
+        }
+    } catch (e) {
+        console.error("Failed to load state", e);
+    }
+}
+
+function animate(time: number = 0) {
+    lastTime = time;
+
+    controls.update();
+    world.step(fixedStep);
+
+    for (const dice of diceList) {
+        if (!dice.hasEnteredTray) {
+            const distSq = dice.body.position.x * dice.body.position.x + dice.body.position.z * dice.body.position.z;
+            // Use a safer threshold to avoid sudden wall collisions
+            if (distSq < (wallLimit - 1.0) * (wallLimit - 1.0)) {
+                dice.hasEnteredTray = true;
+                dice.body.collisionFilterMask = COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND | COLLISION_GROUP_WALLS;
+            }
+        }
+        dice.mesh.position.copy(dice.body.position as any);
+        dice.mesh.quaternion.copy(dice.body.quaternion as any);
+    }
+
+    updateDiceResults();
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+}
+
+window.addEventListener('beforeunload', saveState);
+// Periodic save for camera/physics state
+setInterval(saveState, 1000);
+
+loadState();
+animate();

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>d20.zip</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="stylesheet" href="style.css">
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/examples/jsm/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+            "cannon-es": "https://unpkg.com/cannon-es@0.20.0/dist/cannon-es.js"
+        }
+    }
+    </script>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="hamburger" onclick="window.toggleHistory()">☰</div>
+    <div id="ui">
+        <div style="margin-bottom: 10px; display: flex; justify-content: center; flex-direction: column; width: 100%;">
+            <div class="dice-button-row">
+                <div class="dice-btn-group">
+                    <button class="btn dice-btn-main" onclick="window.rollDice('d2')">D2</button>
+                    <div class="dice-btn-subs">
+                        <div class="sub-btn adv" onclick="window.rollFormula('2d2kh1')">Adv</div>
+                        <div class="sub-btn dis" onclick="window.rollFormula('2d2kl1')">Dis</div>
+                    </div>
+                </div>
+                <div class="dice-btn-group">
+                    <button class="btn dice-btn-main" onclick="window.rollDice('d4')">D4</button>
+                    <div class="dice-btn-subs">
+                        <div class="sub-btn adv" onclick="window.rollFormula('2d4kh1')">Adv</div>
+                        <div class="sub-btn dis" onclick="window.rollFormula('2d4kl1')">Dis</div>
+                    </div>
+                </div>
+                <div class="dice-btn-group">
+                    <button class="btn dice-btn-main" onclick="window.rollDice('d6')">D6</button>
+                    <div class="dice-btn-subs">
+                        <div class="sub-btn adv" onclick="window.rollFormula('2d6kh1')">Adv</div>
+                        <div class="sub-btn dis" onclick="window.rollFormula('2d6kl1')">Dis</div>
+                    </div>
+                </div>
+                <div class="dice-btn-group">
+                    <button class="btn dice-btn-main" onclick="window.rollDice('d8')">D8</button>
+                    <div class="dice-btn-subs">
+                        <div class="sub-btn adv" onclick="window.rollFormula('2d8kh1')">Adv</div>
+                        <div class="sub-btn dis" onclick="window.rollFormula('2d8kl1')">Dis</div>
+                    </div>
+                </div>
+            </div>
+            <div class="dice-button-row">
+                <div class="dice-btn-group">
+                    <button class="btn dice-btn-main" onclick="window.rollDice('d10')">D10</button>
+                    <div class="dice-btn-subs">
+                        <div class="sub-btn adv" onclick="window.rollFormula('2d10kh1')">Adv</div>
+                        <div class="sub-btn dis" onclick="window.rollFormula('2d10kl1')">Dis</div>
+                    </div>
+                </div>
+                <div class="dice-btn-group">
+                    <button class="btn dice-btn-main" onclick="window.rollDice('d12')">D12</button>
+                    <div class="dice-btn-subs">
+                        <div class="sub-btn adv" onclick="window.rollFormula('2d12kh1')">Adv</div>
+                        <div class="sub-btn dis" onclick="window.rollFormula('2d12kl1')">Dis</div>
+                    </div>
+                </div>
+                <div class="dice-btn-group">
+                    <button class="btn dice-btn-main" onclick="window.rollDice('d20')">D20</button>
+                    <div class="dice-btn-subs">
+                        <div class="sub-btn adv" onclick="window.rollFormula('2d20kh1')">Adv</div>
+                        <div class="sub-btn dis" onclick="window.rollFormula('2d20kl1')">Dis</div>
+                    </div>
+                </div>
+                <div class="dice-btn-group">
+                    <button class="btn dice-btn-main" onclick="window.rollDice('d100')">D100</button>
+                    <div class="dice-btn-subs">
+                        <div class="sub-btn adv" onclick="window.rollFormula('2d100kh1')">Adv</div>
+                        <div class="sub-btn dis" onclick="window.rollFormula('2d100kl1')">Dis</div>
+                    </div>
+                </div>
+            </div>
+            <div class="dice-button-row">
+                <input type="text" id="formula" placeholder="e.g. 2d20 + d4">
+                <button class="btn" style="width: 100px; white-space: nowrap;" onclick="window.rollFormula(document.getElementById('formula').value)">Roll</button>
+                <button class="btn" style="width: 100px; white-space: nowrap;" onclick="window.clearAndRoll(document.getElementById('formula').value)">Clear & Roll</button>
+                <button class="btn" style="width: 100px; background: rgba(255,50,50,0.3)" onclick="window.clearDice()">Clear</button>
+            </div>
+
+        </div>
+    </div>
+    <div id="history">
+        <div id="history-header-actions">
+            <button id="clear-history-btn" onclick="window.clearHistory()">Clear History</button>
+        </div>
+        <div id="history-list"></div>
+    </div>
+    <div id="latest-result-container" style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); color: white; text-align: center; pointer-events: none; width: 100%;">
+        <div id="latest-result" style="font-size: 64px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);"></div>
+    </div>
+    <a class="attribution" href="https://www.flaticon.com/free-icons/icosahedron" title="icosahedron icons">Favicon created by Freepik - Flaticon</a>
+    <script type="module" src="dist/index.js"></script>
+</body>
+</html>
