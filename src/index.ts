@@ -141,12 +141,35 @@ function createDiceTexture() {
     // Base font size (scaled for 2048 resolution)
     ctx.font = 'bold 80px Arial';
     ctx.fillStyle = '#4c4c4c';
+    ctx.strokeStyle = '#4c4c4c';
+    ctx.lineCap = 'round';
 
-    // 1-20
+    const drawUnderline = (x: number, y: number, text: string) => {
+        const textWidth = ctx.measureText(text).width;
+        const underlineY = y + cellSize * 0.22;
+        ctx.beginPath();
+        ctx.lineWidth = cellSize * 0.03;
+        ctx.moveTo(x - textWidth / 2, underlineY);
+        ctx.lineTo(x + textWidth / 2, underlineY);
+        ctx.stroke();
+    };
+
+    // 1-20 (standard, no underlines - for D6, D8 etc.)
     for (let i = 0; i < 20; i++) {
         const x = (i % gridSize) * cellSize + cellSize / 2;
         const y = Math.floor(i / gridSize) * cellSize + cellSize / 2;
         ctx.fillText((i + 1).toString(), x, y);
+    }
+
+    // 1-20 with underlines for 6 and 9 (for D12, D20)
+    for (let i = 0; i < 20; i++) {
+        const x = (i % gridSize) * cellSize + cellSize / 2;
+        const y = (2 + Math.floor(i / gridSize)) * cellSize + cellSize / 2;
+        const text = (i + 1).toString();
+        ctx.fillText(text, x, y);
+        if (text === '6' || text === '9') {
+            drawUnderline(x, y, text);
+        }
     }
 
     // 00-90 for D100 tens
@@ -157,12 +180,16 @@ function createDiceTexture() {
         ctx.fillText((i * 10).toString().padStart(2, '0'), x, y);
     }
 
-    // 0-9 for D10
+    // 0-9 for D10 (with underlines for 6 and 9)
     ctx.font = 'bold 80px Arial';
     for (let i = 0; i < 10; i++) {
         const x = (i % gridSize) * cellSize + cellSize / 2;
         const y = (11 + Math.floor(i / gridSize)) * cellSize + cellSize / 2;
-        ctx.fillText(i.toString(), x, y);
+        const text = i.toString();
+        ctx.fillText(text, x, y);
+        if (text === '6' || text === '9') {
+            drawUnderline(x, y, text);
+        }
     }
 
     // D4 special cells in row 12
@@ -390,6 +417,8 @@ function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = f
             valueMultiplier = 1;
             valueOffset = 0;
         }
+    } else if (type === 'd12' || type === 'd20') {
+        baseRow = 2;
     }
 
     if (type === 'd2') {
