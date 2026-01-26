@@ -150,13 +150,11 @@ function createDiceTexture() {
     ctx.shadowColor = 'rgba(0,0,0,0.8)';
     ctx.shadowBlur = 2;
 
-    const verticalOffset = 12;
-
     // 1-100
     for (let i = 0; i < 100; i++) {
         const x = (i % gridSize) * cellSize + cellSize / 2;
         const y = Math.floor(i / gridSize) * cellSize + cellSize / 2;
-        ctx.fillText((i + 1).toString(), x, y + verticalOffset);
+        ctx.fillText((i + 1).toString(), x, y);
     }
 
     // 00-90 for D100 tens
@@ -164,7 +162,7 @@ function createDiceTexture() {
     for (let i = 0; i < 10; i++) {
         const x = (i % gridSize) * cellSize + cellSize / 2;
         const y = (10 + Math.floor(i / gridSize)) * cellSize + cellSize / 2;
-        ctx.fillText((i * 10).toString().padStart(2, '0'), x, y + verticalOffset);
+        ctx.fillText((i * 10).toString().padStart(2, '0'), x, y);
     }
     
     // 0-9 for D10 (often 0-9 instead of 1-10)
@@ -172,7 +170,7 @@ function createDiceTexture() {
     for (let i = 0; i < 10; i++) {
         const x = (i % gridSize) * cellSize + cellSize / 2;
         const y = (11 + Math.floor(i / gridSize)) * cellSize + cellSize / 2;
-        ctx.fillText(i.toString(), x, y + verticalOffset);
+        ctx.fillText(i.toString(), x, y);
     }
 
     // D4 special cells in row 12
@@ -388,15 +386,19 @@ function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = f
                 const vMin = 1 - (row + 1) / gridHeight;
                 const vMax = 1 - row / gridHeight;
 
-                const t = new THREE.Vector3(-1, 0, 0);
-                const bt = new THREE.Vector3(0, 0, 1);
-                if (normal.y < 0) t.set(1, 0, 0); // Flip for bottom face
+                // Better orientation: Top face sees +X as right, -Z as up
+                // Bottom face sees -X as right, -Z as up
+                const isTop = normal.y > 0;
+                const t = new THREE.Vector3(isTop ? 1 : -1, 0, 0);
+                const bt = new THREE.Vector3(0, 0, -1);
+                const scale = 0.55; // Slightly larger numbers for D2
 
                 for (const i of triangleIndices) {
                     for (let j = 0; j < 3; j++) {
                         const v = new THREE.Vector3(pos.getX(i + j), pos.getY(i + j), pos.getZ(i + j));
-                        const uu = v.dot(t) * 0.5 + 0.5;
-                        const vv = v.dot(bt) * 0.5 + 0.5;
+                        const uu = v.dot(t) * scale + 0.5;
+                        // Lower the text slightly by shifting the mapping up
+                        const vv = v.dot(bt) * scale + 0.5 + 0.025;
                         uvs[(i + j) * 2] = uMin + uu * (uMax - uMin);
                         uvs[(i + j) * 2 + 1] = vMin + vv * (vMax - vMin);
                     }
@@ -723,12 +725,11 @@ function addToHistory(formula: string, template: string, id: number, groups: Rol
     }
 };
 
-// ... keep createConvexPolyhedron ...
-
 function createConvexPolyhedron(geometry: THREE.BufferGeometry) {
     const position = geometry.getAttribute('position');
     const vertices: CANNON.Vec3[] = [];
     const faces: number[][] = [];
+    const vertexMap = new Map<string, number>();
     
     for (let i = 0; i < position.count; i += 3) {
         const face: number[] = [];
@@ -737,18 +738,12 @@ function createConvexPolyhedron(geometry: THREE.BufferGeometry) {
             const vy = position.getY(i + j);
             const vz = position.getZ(i + j);
             
-            let index = -1;
-            for (let k = 0; k < vertices.length; k++) {
-                if (Math.abs(vertices[k].x - vx) < 0.01 && 
-                    Math.abs(vertices[k].y - vy) < 0.01 && 
-                    Math.abs(vertices[k].z - vz) < 0.01) {
-                    index = k;
-                    break;
-                }
-            }
-            if (index === -1) {
+            const key = `${Math.round(vx * 100)},${Math.round(vy * 100)},${Math.round(vz * 100)}`;
+            let index = vertexMap.get(key);
+            if (index === undefined) {
                 index = vertices.length;
                 vertices.push(new CANNON.Vec3(vx, vy, vz));
+                vertexMap.set(key, index);
             }
             face.push(index);
         }
@@ -759,10 +754,21 @@ function createConvexPolyhedron(geometry: THREE.BufferGeometry) {
 
 type DiceType = 'd2' | 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'd100';
 
-function createDice(type: DiceType, rollId: number, isTens = false, groupIndex = 0, logicalIndex = 0, indexInRoll = 0, totalInRoll = 1, initialState?: any) {
-    let geometry: THREE.BufferGeometry;
-    let shape: CANNON.Shape;
+interface CachedDiceAsset {
+    geometry: THREE.BufferGeometry;
+    shape: CANNON.Shape;
+    faces: FaceInfo[];
+}
 
+const diceAssetCache = new Map<string, CachedDiceAsset>();
+
+function getDiceAsset(type: DiceType, isTens: boolean): CachedDiceAsset {
+    const cacheKey = `${type}${isTens ? '-tens' : ''}`;
+    if (diceAssetCache.has(cacheKey)) {
+        return diceAssetCache.get(cacheKey)!;
+    }
+
+    let geometry: THREE.BufferGeometry;
     switch(type) {
         case 'd2': geometry = getD2(); break;
         case 'd4': geometry = getD4(); break;
@@ -775,12 +781,28 @@ function createDice(type: DiceType, rollId: number, isTens = false, groupIndex =
     }
 
     const faces = applyDiceUVs(geometry, type, isTens);
-
+    
+    let shape: CANNON.Shape;
     if (type === 'd6') {
-        shape = new CANNON.Box(new CANNON.Vec3(0.4, 0.4, 0.4)); // Half-extents
+        shape = new CANNON.Box(new CANNON.Vec3(0.4, 0.4, 0.4));
+    } else if (type === 'd2') {
+        // Optimization: Use a simpler cylinder for D2 physics instead of 128 triangles
+        // Cannon Cylinder is oriented along Z axis by default
+        shape = new CANNON.Cylinder(0.8, 0.8, 0.15, 16);
     } else {
         shape = createConvexPolyhedron(geometry);
     }
+
+    const asset = { geometry, shape, faces };
+    diceAssetCache.set(cacheKey, asset);
+    return asset;
+}
+
+function createDice(type: DiceType, rollId: number, isTens = false, groupIndex = 0, logicalIndex = 0, indexInRoll = 0, totalInRoll = 1, initialState?: any) {
+    const asset = getDiceAsset(type, isTens);
+    const geometry = asset.geometry;
+    const shape = asset.shape;
+    const faces = asset.faces;
     
     const diceColor = initialState?.color ? new THREE.Color(initialState.color) : new THREE.Color().setHSL(Math.random(), 0.4, 0.5);
     const material = new THREE.MeshPhysicalMaterial({ 
@@ -816,7 +838,7 @@ function createDice(type: DiceType, rollId: number, isTens = false, groupIndex =
 
     body.addShape(shape);
     
-    let hasEnteredTray = false;
+    let hasEnteredTray: boolean;
     if (initialState) {
         body.position.set(initialState.position.x, initialState.position.y, initialState.position.z);
         body.quaternion.set(initialState.quaternion.x, initialState.quaternion.y, initialState.quaternion.z, initialState.quaternion.w);
@@ -828,19 +850,17 @@ function createDice(type: DiceType, rollId: number, isTens = false, groupIndex =
 
         hasEnteredTray = initialState.hasEnteredTray;
     } else {
-        // Scale spread from 0 (at 4 dice) to 2*PI (at 20 dice)
-        const spread = Math.max(0, Math.min(1, (totalInRoll - 4) / 16)) * Math.PI * 2;
+        // Scale spread from 0.3 (for 2 dice) to 2*PI (at 20 dice)
+        const minSpread = 0.3;
+        const spread = totalInRoll > 1 ? (minSpread + Math.max(0, Math.min(1, (totalInRoll - 2) / 18)) * (Math.PI * 2 - minSpread)) : 0;
         
         // Throw from an angle relative to camera (only horizontal angle)
         let finalAngle = controls.getAzimuthalAngle();
         
-        if (totalInRoll > 1 && spread > 0) {
+        if (totalInRoll > 1) {
             // Center the spread on azAngle
             const offset = (indexInRoll / (totalInRoll - 1) - 0.5) * spread;
             finalAngle += offset;
-        } else if (totalInRoll > 1) {
-            // Small jitter even if no spread, to avoid stacking exactly in the same line
-            finalAngle += (Math.random() - 0.5) * 0.2;
         }
 
         const spawnDistance = wallLimit * 1.4;
@@ -850,9 +870,9 @@ function createDice(type: DiceType, rollId: number, isTens = false, groupIndex =
             Math.cos(finalAngle) * spawnDistance
         );
         
-        // Add some random spread to spawn position (smaller now as we have intentional spread)
-        spawnPos.x += (Math.random() - 0.5) * 2;
-        spawnPos.z += (Math.random() - 0.5) * 2;
+        // Add some random jitter to spawn position
+        spawnPos.x += (Math.random() - 0.5) * 4;
+        spawnPos.z += (Math.random() - 0.5) * 4;
         
         body.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
         mesh.position.copy(spawnPos);
@@ -884,7 +904,7 @@ function createDice(type: DiceType, rollId: number, isTens = false, groupIndex =
         
         if (type === 'd2') {
             // Coin flip: significant upward velocity
-            velVec.y = 15 + Math.random() * 10;
+            velVec.y = 8 + Math.random() * 6;
             // Slightly less horizontal speed to keep it more centered during the flip
             velVec.x *= 0.8;
             velVec.z *= 0.8;
@@ -899,7 +919,7 @@ function createDice(type: DiceType, rollId: number, isTens = false, groupIndex =
         if (type === 'd2') {
             // Flip the coin around a horizontal axis perpendicular to its movement
             const flipAxis = new THREE.Vector3(-horizontalDir.z, 0, horizontalDir.x);
-            const flipSpeed = 100 + Math.random() * 50;
+            const flipSpeed = 15 + Math.random() * 10;
             body.angularVelocity.set(
                 flipAxis.x * flipSpeed + (Math.random() - 0.5) * 10,
                 (Math.random() - 0.5) * 20, // some side wobble
@@ -1181,7 +1201,9 @@ function updateDiceResults() {
                             if (tens === 0 && units === 0) res = 100;
                             logicalDieResults.push(res);
                         } else {
-                            logicalDieResults.push(dicePair[0].currentValue || 0);
+                            let val = dicePair[0].currentValue ?? 0;
+                            if (dicePair[0].type === 'd10' && val === 0) val = 10;
+                            logicalDieResults.push(val);
                         }
                     });
                     
@@ -1269,10 +1291,12 @@ function loadState() {
 }
 
 function animate(time: number = 0) {
+    if (lastTime === 0) lastTime = time;
+    const dt = (time - lastTime) / 1000;
     lastTime = time;
 
     controls.update();
-    world.step(fixedStep);
+    world.step(fixedStep, Math.min(dt, 0.1));
 
     for (const dice of diceList) {
         if (!dice.hasEnteredTray) {

@@ -36,6 +36,9 @@ canvas {
     height: 40px;
     pointer-events: auto;
     background: rgba(255, 255, 255, 0.1);
+    background-image: none;
+    appearance: none;
+    -moz-appearance: none;
     border: 1px solid rgba(255, 255, 255, 0.3);
     color: white;
     padding: 0 10px;
@@ -49,12 +52,20 @@ canvas {
     font-size: 14px;
 }
 
+button::-moz-focus-inner {
+    border: 0;
+    padding: 0;
+}
+
 .btn:hover {
     background: rgba(255, 255, 255, 0.2);
 }
 
 #formula {
     background: rgba(255, 255, 255, 0.1);
+    background-image: none;
+    appearance: none;
+    -moz-appearance: none;
     border: 1px solid rgba(255, 255, 255, 0.3);
     color: white;
     padding: 0 10px;
@@ -97,6 +108,9 @@ canvas {
 
 #clear-history-btn {
     background: rgba(255, 50, 50, 0.2);
+    background-image: none;
+    appearance: none;
+    -moz-appearance: none;
     border: 1px solid rgba(255, 255, 255, 0.2);
     color: white;
     padding: 6px 10px;
@@ -128,6 +142,9 @@ canvas {
     cursor: pointer;
     color: white;
     background: rgba(0, 0, 0, 0.5);
+    background-image: none;
+    appearance: none;
+    -moz-appearance: none;
     padding: 10px 15px;
     border-radius: 5px;
     backdrop-filter: blur(5px);
@@ -210,6 +227,9 @@ canvas {
 
 .re-roll-btn {
     background: rgba(255, 255, 255, 0.1);
+    background-image: none;
+    appearance: none;
+    -moz-appearance: none;
     border: 1px solid rgba(255, 255, 255, 0.2);
     color: white;
     padding: 4px 8px;
@@ -225,6 +245,15 @@ canvas {
     justify-content: space-between;
     width: 100%;
     margin-bottom: 5px;
+}
+
+.dice-button-row > .btn {
+    width: 100px;
+    white-space: nowrap;
+}
+
+.btn-danger {
+    background: rgba(255, 50, 50, 0.3) !important;
 }
 
 .dice-btn-group {
@@ -250,6 +279,9 @@ canvas {
 
 .sub-btn {
     background: rgba(255, 255, 255, 0.1);
+    background-image: none;
+    appearance: none;
+    -moz-appearance: none;
     border: 1px solid rgba(255, 255, 255, 0.3);
     color: white;
     padding: 2px 4px;

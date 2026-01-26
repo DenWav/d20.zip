@@ -83,9 +83,9 @@
             </div>
             <div class="dice-button-row">
                 <input type="text" id="formula" placeholder="e.g. 2d20 + d4">
-                <button class="btn" style="width: 100px; white-space: nowrap;" onclick="window.rollFormula(document.getElementById('formula').value)">Roll</button>
-                <button class="btn" style="width: 100px; white-space: nowrap;" onclick="window.clearAndRoll(document.getElementById('formula').value)">Clear & Roll</button>
-                <button class="btn" style="width: 100px; background: rgba(255,50,50,0.3)" onclick="window.clearDice()">Clear</button>
+                <button class="btn" onclick="window.rollFormula(document.getElementById('formula').value)">Roll</button>
+                <button class="btn" onclick="window.clearAndRoll(document.getElementById('formula').value)">Clear & Roll</button>
+                <button class="btn btn-danger" onclick="window.clearDice()">Clear</button>
             </div>
 
         </div>

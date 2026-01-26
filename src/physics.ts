@@ -17,15 +17,17 @@ export class World {
             defaultMaterial,
             {
                 friction: 0.8,
-                restitution: 0.1
+                restitution: 0.1,
+                contactEquationStiffness: 2e7,
+                contactEquationRelaxation: 2
             }
         );
         this.cannonWorld.addContactMaterial(defaultContactMaterial);
         this.cannonWorld.defaultContactMaterial = defaultContactMaterial;
     }
 
-    step(dt: number) {
-        this.cannonWorld.step(dt);
+    step(dt: number, timeSinceLastCalled?: number) {
+        this.cannonWorld.step(dt, timeSinceLastCalled, 10);
     }
 
     addBody(body: CANNON.Body) {
