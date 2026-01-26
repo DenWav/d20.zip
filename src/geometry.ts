@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import { THREE } from './vendor.js';
 
 function toBufferGeometry(vertices: Float32Array, normals: Float32Array, indices: Uint16Array) {
     const geometry = new THREE.BufferGeometry();

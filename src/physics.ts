@@ -1,4 +1,4 @@
-import * as CANNON from 'cannon-es';
+import { CANNON } from './vendor.js';
 
 export class World {
     cannonWorld: CANNON.World;

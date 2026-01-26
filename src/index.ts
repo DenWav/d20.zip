@@ -1,6 +1,4 @@
-import * as THREE from 'three';
-import * as CANNON from 'cannon-es';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { THREE, CANNON, OrbitControls } from './vendor.js';
 import { World } from './physics.js';
 import { getD2, getD4, getCube, getD8, getD10, getD12, getD20 } from './geometry.js';
 

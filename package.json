@@ -4,7 +4,7 @@
     "description": "",
     "main": "dist/index.js",
     "scripts": {
-        "build": "tsc",
+        "build": "tsc && esbuild src/vendor.ts --bundle --minify --sourcemap --format=esm --outfile=dist/vendor.js",
         "start": "npx serve .",
         "format": "prettier --write ."
     },
@@ -14,6 +14,7 @@
     },
     "devDependencies": {
         "@types/three": "^0.182.0",
+        "esbuild": "^0.27.2",
         "prettier": "^3.8.1",
         "typescript": "^5.5.3"
     },
