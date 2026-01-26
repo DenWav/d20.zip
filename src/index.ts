@@ -238,13 +238,14 @@ function createFeltTexture() {
     };
 
     // Add fiber noise
-    for (let i = 0; i < 80000; i++) {
+    for (let i = 0; i < 40000; i++) {
         const x = rng() * size;
         const y = rng() * size;
         const len = rng() * 8 + 2;
         const angle = rng() * Math.PI * 2;
         const opacity = rng() * 0.5;
-        const color = rng() > 0.5 ? `rgba(255,255,255,${opacity})` : `rgba(0,0,0,${opacity})`;
+        const colorBase = rng() > 0.5 ? '255,255,255' : '0,0,0';
+        const color = `rgba(${colorBase},${opacity})`;
         const lineWidth = rng() * 0.8 + 0.5;
 
         const dx = Math.cos(angle) * len;
@@ -266,14 +267,20 @@ function createFeltTexture() {
         const y = rng() * size;
         const radius = rng() * 100 + 5;
         const opacity = rng() * 0.025;
-        const colorStop = rng() > 0.5 ? `rgba(255,255,255,${opacity})` : `rgba(0,0,0,${opacity})`;
+        const colorRGB = rng() > 0.5 ? '255,255,255' : '0,0,0';
+        const colorStop = `rgba(${colorRGB},${opacity})`;
+        const colorStopTransparent = `rgba(${colorRGB},0)`;
 
         drawSeamless(x, y, radius, (ox, oy) => {
-            const grd = ctx.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, radius);
+            // Use small start radius (0.001) instead of 0 for Safari compatibility
+            const grd = ctx.createRadialGradient(x + ox, y + oy, 0.001, x + ox, y + oy, radius);
             grd.addColorStop(0, colorStop);
-            grd.addColorStop(1, 'rgba(0,0,0,0)');
+            grd.addColorStop(1, colorStopTransparent);
             ctx.fillStyle = grd;
-            ctx.fillRect(x + ox - radius, y + oy - radius, radius * 2, radius * 2);
+            // Use arc and fill instead of fillRect for better radial gradient rendering in some browsers
+            ctx.beginPath();
+            ctx.arc(x + ox, y + oy, radius, 0, Math.PI * 2);
+            ctx.fill();
         });
     }
 
