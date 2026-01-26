@@ -573,8 +573,28 @@ function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = f
         // Consistent local coordinate system for the face
         let up = new THREE.Vector3(0, 1, 0);
         if (Math.abs(normal.dot(up)) > 0.9) up.set(0, 0, 1);
-        const tangent = new THREE.Vector3().crossVectors(up, normal).normalize();
-        const bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
+        let tangent = new THREE.Vector3().crossVectors(up, normal).normalize();
+        let bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
+
+        if (type === 'd20') {
+            // For D20, snap the bitangent to the nearest vertex to ensure alignment with triangular sides
+            let maxDot = -Infinity;
+            let bestV = new THREE.Vector3();
+            for (const i of triangleIndices) {
+                for (let j = 0; j < 3; j++) {
+                    const v = new THREE.Vector3(pos.getX(i + j), pos.getY(i + j), pos.getZ(i + j));
+                    const toV = v.clone().sub(center).normalize();
+                    const dot = toV.dot(bitangent);
+                    if (dot > maxDot) {
+                        maxDot = dot;
+                        bestV = toV;
+                    }
+                }
+            }
+            bitangent.copy(bestV);
+            tangent.crossVectors(bitangent, normal).normalize();
+            bitangent.crossVectors(normal, tangent).normalize();
+        }
 
         // Find bounding box in local 2D space to scale properly
         let minU = Infinity,
