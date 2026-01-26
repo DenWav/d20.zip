@@ -43,12 +43,23 @@ const fillLight = new THREE.DirectionalLight(0x446688, 0.5);
 fillLight.position.set(-10, 10, -10);
 scene.add(fillLight);
 
+// --- Seeded Random for Deterministic Assets ---
+function mulberry32(a: number) {
+    return function () {
+        let t = (a += 0x6d2b79f5);
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
 // Environment setup
 const pmremGenerator = new THREE.PMREMGenerator(renderer);
 pmremGenerator.compileEquirectangularShader();
 
 // Create a simple procedural environment map (gradient)
 function createEnvironmentMap() {
+    const rng = mulberry32(98765);
     const scene = new THREE.Scene();
     const geom = new THREE.SphereGeometry(1, 64, 32);
     const mat = new THREE.ShaderMaterial({
@@ -85,7 +96,7 @@ function createEnvironmentMap() {
     // Add some random bright points to the env map for highlights
     for (let i = 0; i < 6; i++) {
         const light = new THREE.PointLight(0xffffff, 20);
-        light.position.set((Math.random() - 0.5) * 2, Math.random() * 2, (Math.random() - 0.5) * 2);
+        light.position.set((rng() - 0.5) * 2, rng() * 2, (rng() - 0.5) * 2);
         scene.add(light);
     }
 
@@ -100,6 +111,7 @@ const world = new World();
 
 // --- Dice Number Texture ---
 function createDiceTexture() {
+    const rng = mulberry32(12345);
     const canvas = document.createElement('canvas');
     // Double resolution for better sharpness
     canvas.width = 2048;
@@ -113,21 +125,21 @@ function createDiceTexture() {
     // Subtle Marble/Granite Texture
     // Layer 1: Larger speckles
     for (let i = 0; i < 5000; i++) {
-        const opacity = 0.2 + Math.random() * 0.3;
-        ctx.fillStyle = Math.random() > 0.5 ? `rgba(0,0,0,${opacity})` : `rgba(255,255,255,${opacity})`;
-        const x = Math.random() * canvas.width;
-        const y = Math.random() * canvas.height;
-        const s = 4 + Math.random() * 6;
+        const opacity = 0.2 + rng() * 0.3;
+        ctx.fillStyle = rng() > 0.5 ? `rgba(0,0,0,${opacity})` : `rgba(255,255,255,${opacity})`;
+        const x = rng() * canvas.width;
+        const y = rng() * canvas.height;
+        const s = 4 + rng() * 6;
         ctx.fillRect(x, y, s, s);
     }
 
     // Layer 2: Fine dust particles
     for (let i = 0; i < 25000; i++) {
-        const opacity = 0.2 + Math.random() * 0.4;
-        ctx.fillStyle = Math.random() > 0.5 ? `rgba(0,0,0,${opacity})` : `rgba(255,255,255,${opacity})`;
-        const x = Math.random() * canvas.width;
-        const y = Math.random() * canvas.height;
-        const s = 2 + Math.random() * 2;
+        const opacity = 0.2 + rng() * 0.4;
+        ctx.fillStyle = rng() > 0.5 ? `rgba(0,0,0,${opacity})` : `rgba(255,255,255,${opacity})`;
+        const x = rng() * canvas.width;
+        const y = rng() * canvas.height;
+        const s = 2 + rng() * 2;
         ctx.fillRect(x, y, s, s);
     }
 
@@ -215,6 +227,7 @@ function createDiceTexture() {
 }
 
 function createFeltTexture() {
+    const rng = mulberry32(54321);
     const canvas = document.createElement('canvas');
     const size = 512;
     canvas.width = size;
@@ -240,13 +253,13 @@ function createFeltTexture() {
 
     // Add fiber noise - more fibers, more opaque, slightly larger
     for (let i = 0; i < 60000; i++) {
-        const x = Math.random() * size;
-        const y = Math.random() * size;
-        const len = Math.random() * 8 + 2;
-        const angle = Math.random() * Math.PI * 2;
-        const opacity = Math.random() * 0.4;
-        const color = Math.random() > 0.5 ? `rgba(255,255,255,${opacity})` : `rgba(0,0,0,${opacity})`;
-        const lineWidth = Math.random() * 0.8 + 0.4;
+        const x = rng() * size;
+        const y = rng() * size;
+        const len = rng() * 8 + 2;
+        const angle = rng() * Math.PI * 2;
+        const opacity = rng() * 0.4;
+        const color = rng() > 0.5 ? `rgba(255,255,255,${opacity})` : `rgba(0,0,0,${opacity})`;
+        const lineWidth = rng() * 0.8 + 0.4;
 
         const dx = Math.cos(angle) * len;
         const dy = Math.sin(angle) * len;
@@ -263,11 +276,11 @@ function createFeltTexture() {
 
     // Add more noticeable organic splotches
     for (let i = 0; i < 40; i++) {
-        const x = Math.random() * size;
-        const y = Math.random() * size;
-        const radius = Math.random() * 100 + 50;
-        const opacity = Math.random() * 0.15;
-        const colorStop = Math.random() > 0.5 ? `rgba(255,255,255,${opacity})` : `rgba(0,0,0,${opacity})`;
+        const x = rng() * size;
+        const y = rng() * size;
+        const radius = rng() * 100 + 50;
+        const opacity = rng() * 0.15;
+        const colorStop = rng() > 0.5 ? `rgba(255,255,255,${opacity})` : `rgba(0,0,0,${opacity})`;
 
         drawSeamless(x, y, radius, (ox, oy) => {
             const grd = ctx.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, radius);
@@ -668,13 +681,18 @@ interface RollGroup {
     keepCount?: number;
 }
 
+interface GroupResult {
+    value: number;
+    kept: boolean;
+}
+
 interface RollRecord {
     id: number;
     formula: string;
     template: string;
     result: number | null;
     groups: RollGroup[];
-    groupResults: number[][]; // Store actual values for each group
+    groupResults: (GroupResult | number)[][]; // Store actual values for each group
 }
 const rollHistory: RollRecord[] = [];
 const maxHistory = 20;
@@ -686,10 +704,17 @@ function formatBreakdown(record: RollRecord): string {
         const idx = parseInt(idxStr);
         const vals = record.groupResults[idx];
         if (!vals) return '?';
-        if (vals.length > 1) {
-            return `(${vals.join(' + ')})`;
+        if (vals.length > 1 || (vals.length === 1 && (typeof vals[0] === 'number' || !vals[0].kept))) {
+            const parts = vals.map((v) => {
+                if (typeof v === 'number') return v.toString();
+                return v.kept ? v.value.toString() : `<del>${v.value}</del>`;
+            });
+            return `(${parts.join(' + ')})`;
+        } else if (vals.length === 1) {
+            const v = vals[0];
+            return typeof v === 'number' ? v.toString() : v.value.toString();
         } else {
-            return vals[0].toString();
+            return '0';
         }
     });
 }
@@ -1268,18 +1293,20 @@ function updateDiceResults() {
                     });
 
                     // Apply kh/kl logic
-                    let keptResults = [...logicalDieResults];
+                    let allResults = logicalDieResults.map((v) => ({ value: v, kept: true }));
                     if (group.keepType && group.keepCount !== undefined) {
                         if (group.keepType === 'kh') {
-                            keptResults.sort((a, b) => b - a);
+                            allResults.sort((a, b) => b.value - a.value);
                         } else {
-                            keptResults.sort((a, b) => a - b);
+                            allResults.sort((a, b) => a.value - b.value);
                         }
-                        keptResults = keptResults.slice(0, group.keepCount);
+                        for (let i = group.keepCount; i < allResults.length; i++) {
+                            allResults[i].kept = false;
+                        }
                     }
 
-                    record.groupResults[groupIdx] = keptResults;
-                    groupValues.push(keptResults.reduce((a, b) => a + b, 0));
+                    record.groupResults[groupIdx] = allResults;
+                    groupValues.push(allResults.filter((r) => r.kept).reduce((a, b) => a + b.value, 0));
                 });
 
                 const evalFormula = record.template.replace(/__G(\d+)__/g, (_, idxStr) => {

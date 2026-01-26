@@ -221,6 +221,12 @@ button::-moz-focus-inner {
     font-style: italic;
 }
 
+.history-breakdown del {
+    text-decoration: line-through;
+    opacity: 0.5;
+    margin: 0 1px;
+}
+
 .history-item:last-child {
     border-bottom: none;
 }
