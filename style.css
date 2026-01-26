@@ -57,8 +57,14 @@ button::-moz-focus-inner {
     padding: 0;
 }
 
-.btn:hover {
-    background: rgba(255, 255, 255, 0.2);
+@media (hover: hover) {
+    .btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+}
+
+.btn:active {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 #formula {
@@ -124,8 +130,14 @@ button::-moz-focus-inner {
     background: rgba(255, 50, 50, 0.2);
 }
 
-#clear-history-btn:hover {
-    background: rgba(255, 50, 50, 0.4);
+@media (hover: hover) {
+    #clear-history-btn:hover {
+        background: rgba(255, 50, 50, 0.4);
+    }
+}
+
+#clear-history-btn:active {
+    background: rgba(255, 50, 50, 0.6);
 }
 
 #reset-camera-btn {
@@ -133,8 +145,14 @@ button::-moz-focus-inner {
     margin-left: auto;
 }
 
-#reset-camera-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
+@media (hover: hover) {
+    #reset-camera-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+}
+
+#reset-camera-btn:active {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 #history-list {
@@ -163,6 +181,16 @@ button::-moz-focus-inner {
     font-size: 20px;
     border: 1px solid rgba(255, 255, 255, 0.3);
     transition: transform 0.3s ease-in-out;
+}
+
+@media (hover: hover) {
+    #hamburger:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+}
+
+#hamburger:active {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 @media (max-width: 1200px) {
@@ -210,8 +238,10 @@ button::-moz-focus-inner {
     border-radius: 4px;
 }
 
-#history-list::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
+@media (hover: hover) {
+    #history-list::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
 }
 
 .history-item {
@@ -263,6 +293,16 @@ button::-moz-focus-inner {
     cursor: pointer;
     font-size: 11px;
     align-self: flex-start;
+}
+
+@media (hover: hover) {
+    .re-roll-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+}
+
+.re-roll-btn:active {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 .dice-button-row {
@@ -323,8 +363,14 @@ button::-moz-focus-inner {
     backdrop-filter: blur(5px);
 }
 
-.sub-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
+@media (hover: hover) {
+    .sub-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+}
+
+.sub-btn:active {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 .sub-btn.adv {
