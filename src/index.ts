@@ -3,7 +3,7 @@ import { World } from './physics.js';
 import { getD2, getD4, getCube, getD8, getD10, getD12, getD20 } from './geometry.js';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
@@ -24,17 +24,17 @@ controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
 controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
 controls.mouseButtons.MIDDLE = null;
 
-controls.touches.ONE = THREE.TOUCH.PAN
-controls.touches.TWO = THREE.TOUCH.DOLLY_ROTATE
+controls.touches.ONE = THREE.TOUCH.PAN;
+controls.touches.TWO = THREE.TOUCH.DOLLY_ROTATE;
 
 controls.enableDamping = true;
 controls.screenSpacePanning = false;
 
 // Lights
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); // Reduced from 0.6
+const ambientLight = new THREE.AmbientLight(0xf2ebd8, 0.55);
 scene.add(ambientLight);
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5); // Increased from 1.0
+const directionalLight = new THREE.DirectionalLight(0xf0ebdd, 1.8);
 directionalLight.position.set(10, 20, 10);
 directionalLight.castShadow = true;
 directionalLight.shadow.camera.left = -15;
@@ -636,7 +636,21 @@ world.addBody(floorBody);
 // Visual Walls & Physics Walls
 const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.5 });
 const wallSideLength = 2 * floorRadius * Math.sin(Math.PI / wallCount);
-const wallGeom = new THREE.BoxGeometry(wallSideLength, wallHeight + 0.01, wallThickness);
+
+const wallInLen = 2 * (wallLimit - wallThickness / 2) * Math.tan(Math.PI / wallCount);
+const wallOutLen = 2 * (wallLimit + wallThickness / 2) * Math.tan(Math.PI / wallCount);
+const wallShape = new THREE.Shape();
+wallShape.moveTo(-wallInLen / 2, -wallThickness / 2);
+wallShape.lineTo(wallInLen / 2, -wallThickness / 2);
+wallShape.lineTo(wallOutLen / 2, wallThickness / 2);
+wallShape.lineTo(-wallOutLen / 2, wallThickness / 2);
+wallShape.closePath();
+const wallGeom = new THREE.ExtrudeGeometry(wallShape, {
+    depth: wallHeight + 0.01,
+    bevelEnabled: false,
+});
+wallGeom.rotateX(Math.PI / 2);
+wallGeom.center();
 
 const wallInstancedMesh = new THREE.InstancedMesh(wallGeom, wallMaterial, wallCount);
 wallInstancedMesh.castShadow = true;
@@ -702,7 +716,10 @@ class InstancedDiceManager {
     private projScreenMatrix = new THREE.Matrix4();
     private capacity = 256;
 
-    constructor(private scene: THREE.Scene, private material: THREE.Material) {}
+    constructor(
+        private scene: THREE.Scene,
+        private material: THREE.Material
+    ) {}
 
     getInstancedMesh(type: DiceType, isTens: boolean): THREE.InstancedMesh {
         const key = `${type}${isTens ? '-tens' : ''}`;
@@ -721,7 +738,10 @@ class InstancedDiceManager {
 
     update(diceList: Dice[], camera: THREE.Camera) {
         camera.updateMatrixWorld();
-        this.projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse.copy(camera.matrixWorld).invert());
+        this.projScreenMatrix.multiplyMatrices(
+            camera.projectionMatrix,
+            camera.matrixWorldInverse.copy(camera.matrixWorld).invert()
+        );
         this.frustum.setFromProjectionMatrix(this.projScreenMatrix);
 
         const counts = new Map<string, number>();
@@ -1049,10 +1069,12 @@ function createDice(
         mesh.quaternion.copy(body.quaternion as any);
 
         // Velocity: towards the center area (with enough variation to prevent piling)
+        // Use a centered target area to ensure dice hit the tray, with more spread for larger rolls.
+        const targetRange = wallLimit * (totalInRoll > 1 ? 1.0 : 0.5);
         const throwTarget = new THREE.Vector3(
-            (Math.random() - 0.5) * wallLimit * 1.2,
+            (Math.random() - 0.5) * targetRange,
             0,
-            (Math.random() - 0.5) * wallLimit * 1.2
+            (Math.random() - 0.5) * targetRange
         );
 
         // Calculate horizontal direction only
@@ -1060,8 +1082,8 @@ function createDice(
         horizontalDir.y = 0;
         horizontalDir.normalize();
 
-        // Add some random variation to the throw angle
-        const angleVar = (Math.random() - 0.5) * 0.4; // +/- 0.2 radians
+        // Add some random variation to the throw angle (reduced to prevent missing the tray)
+        const angleVar = (Math.random() - 0.5) * 0.2; // +/- 0.1 radians
         horizontalDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), angleVar);
 
         const speed = 15 + Math.random() * 10;
@@ -1150,8 +1172,7 @@ function evaluateMath(expr: string): number {
                 values.push(a * b);
                 break;
             case '/':
-                const res = a / b;
-                values.push(Math.round(res * 10) / 10);
+                values.push(a / b);
                 break;
         }
     };
@@ -1179,7 +1200,8 @@ function evaluateMath(expr: string): number {
         applyOp();
     }
 
-    return values[0] || 0;
+    const result = values[0] || 0;
+    return Math.round(result * 10) / 10;
 }
 
 (window as any).rollDice = (type?: DiceType) => {
@@ -1506,13 +1528,13 @@ function loadState() {
     }
 }
 
-const stats = new Stats()
-stats.showPanel(0) // 0: fps, 1: ms, 2: mb, 3+: custom
-stats.dom.style.zIndex = '999'
-document.body.appendChild(stats.dom)
+const stats = new Stats();
+stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
+stats.dom.style.zIndex = '999';
+document.body.appendChild(stats.dom);
 
 function animate(time: number = 0) {
-    stats.begin()
+    stats.begin();
     if (lastTime === 0) lastTime = time;
     const dt = (time - lastTime) / 1000;
     lastTime = time;
@@ -1537,7 +1559,7 @@ function animate(time: number = 0) {
     updateDiceResults();
 
     renderer.render(scene, camera);
-    stats.end()
+    stats.end();
 
     requestAnimationFrame(animate);
 }
