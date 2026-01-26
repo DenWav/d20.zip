@@ -669,6 +669,7 @@ interface Dice {
     groupIndex: number;
     logicalIndex: number; // for d100, both physical dice share same logicalIndex
     isTens?: boolean;
+    spawnTime: number;
 }
 
 const diceList: Dice[] = [];
@@ -893,11 +894,11 @@ function createDice(
 
     const body = new CANNON.Body({
         mass: 15,
-        linearDamping: 0.1,
-        angularDamping: 0.1,
+        linearDamping: 0.2,
+        angularDamping: 0.2,
         allowSleep: true,
         sleepSpeedLimit: 0.2,
-        sleepTimeLimit: 1.0,
+        sleepTimeLimit: 0.8,
         collisionFilterGroup: COLLISION_GROUP_DICE,
         collisionFilterMask: COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND,
     });
@@ -922,6 +923,10 @@ function createDice(
 
         mesh.position.copy(body.position as any);
         mesh.quaternion.copy(body.quaternion as any);
+
+        if (initialState.isSettled) {
+            body.sleep();
+        }
 
         hasEnteredTray = initialState.hasEnteredTray;
     } else {
@@ -1033,6 +1038,7 @@ function createDice(
         groupIndex,
         logicalIndex,
         isTens,
+        spawnTime: initialState ? initialState.spawnTime : Date.now(),
     });
 }
 
@@ -1114,6 +1120,14 @@ function evaluateMath(expr: string): number {
 (window as any).clearHistory = () => {
     rollHistory.length = 0;
     updateHistoryUI();
+    saveState();
+};
+
+(window as any).resetCamera = () => {
+    controls.enableDamping = false;
+    controls.reset();
+    controls.reset(); // 2nd call is sometimes necessary for high angular velocity
+    controls.enableDamping = true;
     saveState();
 };
 
@@ -1323,9 +1337,11 @@ function updateDiceResults() {
 }
 
 function saveState() {
+    const formulaInput = document.getElementById('formula') as HTMLInputElement;
     const state = {
         rollHistory,
         nextRollId,
+        formula: formulaInput ? formulaInput.value : '',
         camera: {
             position: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
             target: { x: controls.target.x, y: controls.target.y, z: controls.target.z },
@@ -1349,6 +1365,7 @@ function saveState() {
             currentValue: d.currentValue,
             isSettled: d.isSettled,
             hasEnteredTray: d.hasEnteredTray,
+            spawnTime: d.spawnTime,
         })),
     };
     localStorage.setItem('d20_state', JSON.stringify(state));
@@ -1361,6 +1378,10 @@ function loadState() {
         const state = JSON.parse(saved);
         if (state.nextRollId !== undefined) {
             nextRollId = state.nextRollId;
+        }
+        if (state.formula !== undefined) {
+            const formulaInput = document.getElementById('formula') as HTMLInputElement;
+            if (formulaInput) formulaInput.value = state.formula;
         }
         if (state.rollHistory) {
             rollHistory.length = 0;
@@ -1399,6 +1420,7 @@ function animate(time: number = 0) {
     controls.update();
     world.step(fixedStep, Math.min(dt, 0.1));
 
+    const now = Date.now();
     for (const dice of diceList) {
         if (!dice.hasEnteredTray) {
             const distSq = dice.body.position.x * dice.body.position.x + dice.body.position.z * dice.body.position.z;
@@ -1408,6 +1430,31 @@ function animate(time: number = 0) {
                 dice.body.collisionFilterMask = COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND | COLLISION_GROUP_WALLS;
             }
         }
+
+        // Settling assistant: if dice takes too long to settle (e.g. wiggling in a stack), help it out
+        if (!dice.isSettled) {
+            const activeTime = (now - dice.spawnTime) / 1000;
+            if (activeTime > 3.0) {
+                // Gradually increase damping to force settlement
+                const factor = Math.min(1.0, (activeTime - 3.0) / 2.0); // Max effect after 5.0s
+                dice.body.linearDamping = 0.2 + factor * 0.7;
+                dice.body.angularDamping = 0.2 + factor * 0.7;
+
+                // Hard sleep: if moving slowly after a timeout, force sleep
+                if (activeTime > 4.0) {
+                    const linVel = dice.body.velocity.length();
+                    const angVel = dice.body.angularVelocity.length();
+                    if (linVel < 0.3 && angVel < 0.3) {
+                        dice.body.sleep();
+                    }
+                }
+            }
+        } else {
+            // Reset damping when settled
+            dice.body.linearDamping = 0.2;
+            dice.body.angularDamping = 0.2;
+        }
+
         dice.mesh.position.copy(dice.body.position as any);
         dice.mesh.quaternion.copy(dice.body.quaternion as any);
     }

@@ -106,8 +106,8 @@ button::-moz-focus-inner {
     justify-content: flex-start;
 }
 
-#clear-history-btn {
-    background: rgba(255, 50, 50, 0.2);
+#clear-history-btn,
+#reset-camera-btn {
     background-image: none;
     appearance: none;
     -moz-appearance: none;
@@ -120,8 +120,21 @@ button::-moz-focus-inner {
     transition: background 0.2s;
 }
 
+#clear-history-btn {
+    background: rgba(255, 50, 50, 0.2);
+}
+
 #clear-history-btn:hover {
     background: rgba(255, 50, 50, 0.4);
+}
+
+#reset-camera-btn {
+    background: rgba(255, 255, 255, 0.1);
+    margin-left: auto;
+}
+
+#reset-camera-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 #history-list {
