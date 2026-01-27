@@ -1350,6 +1350,29 @@ function evaluateMath(expr: string): number {
     }
 };
 
+function getDiceTypeFromSides(sides: number): DiceType | null {
+    switch (sides) {
+        case 2:
+            return 'd2';
+        case 4:
+            return 'd4';
+        case 6:
+            return 'd6';
+        case 8:
+            return 'd8';
+        case 10:
+            return 'd10';
+        case 12:
+            return 'd12';
+        case 20:
+            return 'd20';
+        case 100:
+            return 'd100';
+        default:
+            return null;
+    }
+}
+
 (window as any).rollFormula = (formula: string) => {
     if (!formula.trim()) return;
     const rollId = nextRollId++;
@@ -1358,26 +1381,39 @@ function evaluateMath(expr: string): number {
 
     const diceRegex = /(\d*)d(\d+)(kh|kl)?(\d*)/g;
 
-    // First pass: count total physical dice
-    let totalPhysicalDice = 0;
-    const matches = Array.from(template.matchAll(diceRegex));
-    for (const match of matches) {
-        const count = match[1] === '' ? 1 : parseInt(match[1]);
-        const sides = parseInt(match[2]);
-        const typeSupported = [2, 4, 6, 8, 10, 12, 20, 100].includes(sides);
-        if (typeSupported) {
-            totalPhysicalDice += sides === 100 ? count * 2 : count;
+    // 1. Parse formula to identify groups and build template with placeholders
+    template = template.replace(diceRegex, (match, p1, p2, p3, p4) => {
+        const count = p1 === '' ? 1 : parseInt(p1);
+        const sides = parseInt(p2);
+        const type = getDiceTypeFromSides(sides);
+
+        if (type) {
+            const keepType = (p3 as 'kh' | 'kl' | undefined);
+            const keepCountRaw = p4;
+            const keepCount = keepCountRaw === '' ? (keepType ? 1 : undefined) : parseInt(keepCountRaw);
+
+            const groupIndex = groups.length;
+            groups.push({ type, count, keepType, keepCount });
+            return `__G${groupIndex}__`;
         }
+        return match;
+    });
+
+    if (groups.length === 0) return;
+
+    // 2. Calculate total physical dice
+    let totalPhysicalDice = 0;
+    for (const group of groups) {
+        totalPhysicalDice += group.type === 'd100' ? group.count * 2 : group.count;
     }
 
+    // 3. Capacity check and cleanup
     if (totalPhysicalDice > 256) {
         showErrorMessage();
         return;
     }
-
     hideErrorMessage();
 
-    // Remove oldest rolls to make room
     let removedFromHistory = false;
     while (diceList.length + totalPhysicalDice > 256 && diceList.length > 0) {
         const oldestRollId = diceList[0].rollId;
@@ -1399,45 +1435,48 @@ function evaluateMath(expr: string): number {
         saveState();
     }
 
-    let groupCounter = 0;
+    // 4. Prepare for spawning
+    const shuffledIndices = Array.from({ length: totalPhysicalDice }, (_, i) => i);
+    for (let i = shuffledIndices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledIndices[i], shuffledIndices[j]] = [shuffledIndices[j], shuffledIndices[i]];
+    }
+
     let diceCounter = 0;
+    let cumulativeDelay = 0;
 
-    template = template.replace(diceRegex, (match, p1, p2, p3, p4) => {
-        const count = p1 === '' ? 1 : parseInt(p1);
-        const sides = parseInt(p2);
-        const keepType = p3 as 'kh' | 'kl' | undefined;
-        const keepCountRaw = p4;
-        const keepCount = keepCountRaw === '' ? (keepType ? 1 : undefined) : parseInt(keepCountRaw);
+    // 5. Spawn dice
+    groups.forEach((group, groupIndex) => {
+        for (let i = 0; i < group.count; i++) {
+            const logicalIndex = i;
+            if (group.type === 'd100') {
+                const idx1 = shuffledIndices[diceCounter++];
+                const delay1 = cumulativeDelay;
+                cumulativeDelay += 10 + Math.random() * 10;
+                setTimeout(() => {
+                    createDice('d100', rollId, true, groupIndex, logicalIndex, idx1, totalPhysicalDice);
+                }, delay1);
 
-        let type: DiceType | null = null;
-        if (sides === 2) type = 'd2';
-        else if (sides === 4) type = 'd4';
-        else if (sides === 6) type = 'd6';
-        else if (sides === 8) type = 'd8';
-        else if (sides === 10) type = 'd10';
-        else if (sides === 12) type = 'd12';
-        else if (sides === 20) type = 'd20';
-        else if (sides === 100) type = 'd100';
-
-        if (type) {
-            const groupIndex = groupCounter++;
-            groups.push({ type, count, keepType, keepCount });
-            for (let i = 0; i < count; i++) {
-                if (type === 'd100') {
-                    createDice('d100', rollId, true, groupIndex, i, diceCounter++, totalPhysicalDice);
-                    createDice('d100', rollId, false, groupIndex, i, diceCounter++, totalPhysicalDice);
-                } else {
-                    createDice(type, rollId, false, groupIndex, i, diceCounter++, totalPhysicalDice);
-                }
+                const idx2 = shuffledIndices[diceCounter++];
+                const delay2 = cumulativeDelay;
+                cumulativeDelay += 10 + Math.random() * 10;
+                setTimeout(() => {
+                    createDice('d100', rollId, false, groupIndex, logicalIndex, idx2, totalPhysicalDice);
+                }, delay2);
+            } else {
+                const idx = shuffledIndices[diceCounter++];
+                const delay = cumulativeDelay;
+                cumulativeDelay += 10 + Math.random() * 10;
+                const dType = group.type;
+                setTimeout(() => {
+                    createDice(dType, rollId, false, groupIndex, logicalIndex, idx, totalPhysicalDice);
+                }, delay);
             }
-            return `__G${groupIndex}__`;
         }
-        return match;
     });
 
-    if (groups.length > 0) {
-        addToHistory(formula, template, rollId, groups);
-    }
+    // 6. Add to history
+    addToHistory(formula, template, rollId, groups);
 };
 
 const formulaInput = document.getElementById('formula') as HTMLInputElement;
@@ -1514,67 +1553,76 @@ function updateDiceResults() {
 
     // Update History for completed rolls
     for (const rollId of rollsToUpdate) {
+        const record = rollHistory.find((r) => r.id === rollId);
+        if (!record) {
+            pruneDiceList();
+            continue;
+        }
+        if (record.result !== null) continue;
+
         const rollDice = diceList.filter((d) => d.rollId === rollId);
+
+        let expectedTotal = 0;
+        for (const group of record.groups) {
+            expectedTotal += group.type === 'd100' ? group.count * 2 : group.count;
+        }
+
+        if (rollDice.length < expectedTotal) continue;
+
         const allSettled = rollDice.every((d) => d.isSettled);
-
         if (allSettled) {
-            const record = rollHistory.find((r) => r.id === rollId);
-            if (record && record.result === null) {
-                const groupValues: number[] = [];
+            const groupValues: number[] = [];
 
-                record.groups.forEach((group, groupIdx) => {
-                    const groupDice = rollDice.filter((d) => d.groupIndex === groupIdx);
+            record.groups.forEach((group, groupIdx) => {
+                const groupDice = rollDice.filter((d) => d.groupIndex === groupIdx);
 
-                    // Group dice by logicalIndex (relevant for d100)
-                    const logicalDieResults: number[] = [];
-                    const logicalGroups = new Map<number, Dice[]>();
-                    groupDice.forEach((d) => {
-                        if (!logicalGroups.has(d.logicalIndex)) logicalGroups.set(d.logicalIndex, []);
-                        logicalGroups.get(d.logicalIndex)!.push(d);
-                    });
+                // Group dice by logicalIndex (relevant for d100)
+                const logicalDieResults: number[] = [];
+                const logicalGroups = new Map<number, Dice[]>();
+                groupDice.forEach((d) => {
+                    if (!logicalGroups.has(d.logicalIndex)) logicalGroups.set(d.logicalIndex, []);
+                    logicalGroups.get(d.logicalIndex)!.push(d);
+                });
 
-                    logicalGroups.forEach((dicePair) => {
-                        if (dicePair[0].type === 'd100') {
-                            const tens = dicePair.find((d) => d.isTens)?.currentValue || 0;
-                            const units = dicePair.find((d) => !d.isTens)?.currentValue || 0;
-                            let res = tens + units;
-                            if (tens === 0 && units === 0) res = 100;
-                            logicalDieResults.push(res);
-                        } else {
-                            let val = dicePair[0].currentValue ?? 0;
-                            if (dicePair[0].type === 'd10' && val === 0) val = 10;
-                            logicalDieResults.push(val);
-                        }
-                    });
-
-                    // Apply kh/kl logic
-                    let allResults = logicalDieResults.map((v) => ({ value: v, kept: true }));
-                    if (group.keepType && group.keepCount !== undefined) {
-                        if (group.keepType === 'kh') {
-                            allResults.sort((a, b) => b.value - a.value);
-                        } else {
-                            allResults.sort((a, b) => a.value - b.value);
-                        }
-                        for (let i = group.keepCount; i < allResults.length; i++) {
-                            allResults[i].kept = false;
-                        }
+                logicalGroups.forEach((dicePair) => {
+                    if (dicePair[0].type === 'd100') {
+                        const tens = dicePair.find((d) => d.isTens)?.currentValue || 0;
+                        const units = dicePair.find((d) => !d.isTens)?.currentValue || 0;
+                        let res = tens + units;
+                        if (tens === 0 && units === 0) res = 100;
+                        logicalDieResults.push(res);
+                    } else {
+                        let val = dicePair[0].currentValue ?? 0;
+                        if (dicePair[0].type === 'd10' && val === 0) val = 10;
+                        logicalDieResults.push(val);
                     }
-
-                    record.groupResults[groupIdx] = allResults;
-                    groupValues.push(allResults.filter((r) => r.kept).reduce((a, b) => a + b.value, 0));
                 });
 
-                const evalFormula = record.template.replace(/__G(\d+)__/g, (_, idxStr) => {
-                    const idx = parseInt(idxStr);
-                    return groupValues[idx] !== undefined ? groupValues[idx].toString() : '0';
-                });
+                // Apply kh/kl logic
+                let allResults = logicalDieResults.map((v) => ({ value: v, kept: true }));
+                if (group.keepType && group.keepCount !== undefined) {
+                    if (group.keepType === 'kh') {
+                        allResults.sort((a, b) => b.value - a.value);
+                    } else {
+                        allResults.sort((a, b) => a.value - b.value);
+                    }
+                    for (let i = group.keepCount; i < allResults.length; i++) {
+                        allResults[i].kept = false;
+                    }
+                }
 
-                record.result = evaluateMath(evalFormula);
-                updateHistoryUI();
-                saveState();
-            } else if (!record) {
-                pruneDiceList();
-            }
+                record.groupResults[groupIdx] = allResults;
+                groupValues.push(allResults.filter((r) => r.kept).reduce((a, b) => a + b.value, 0));
+            });
+
+            const evalFormula = record.template.replace(/__G(\d+)__/g, (_, idxStr) => {
+                const idx = parseInt(idxStr);
+                return groupValues[idx] !== undefined ? groupValues[idx].toString() : '0';
+            });
+
+            record.result = evaluateMath(evalFormula);
+            updateHistoryUI();
+            saveState();
         }
     }
 }

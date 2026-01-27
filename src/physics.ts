@@ -39,8 +39,8 @@ export class World {
         // Dice vs Dice (Bouncy)
         this.cannonWorld.addContactMaterial(
             new CANNON.ContactMaterial(this.diceMaterial, this.diceMaterial, {
-                friction: 0.9,
-                restitution: 0.7,
+                friction: 0.3,
+                restitution: 0.9,
                 contactEquationStiffness: 1e8,
                 contactEquationRelaxation: 10,
                 frictionEquationStiffness: 1e6,
@@ -51,7 +51,7 @@ export class World {
         // Dice vs Wall (Bouncy)
         this.cannonWorld.addContactMaterial(
             new CANNON.ContactMaterial(this.diceMaterial, this.wallMaterial, {
-                friction: 0.9,
+                friction: 0.4,
                 restitution: 0.7,
                 contactEquationStiffness: 1e8,
                 contactEquationRelaxation: 10,
@@ -63,8 +63,8 @@ export class World {
         // Dice vs Floor (Low bounciness)
         this.cannonWorld.addContactMaterial(
             new CANNON.ContactMaterial(this.diceMaterial, this.floorMaterial, {
-                friction: 0.9,
-                restitution: 0.1,
+                friction: 0.7,
+                restitution: 0.2,
                 contactEquationStiffness: 1e8,
                 contactEquationRelaxation: 10,
                 frictionEquationStiffness: 1e6,
