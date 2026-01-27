@@ -24,7 +24,7 @@ experience with it.</sub>
 Libraries:
 
 - [three.js](https://threejs.org/) (3D engine)
-- [cannon-es](https://pmndrs.github.io/cannon-es/) (physics engine)
+- [Rapier](https://rapier.rs/) (physics engine)
 - [stats.js](https://mrdoob.github.io/stats.js/) (performance monitor)
 
 Icons:

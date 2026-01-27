@@ -1,83 +1,31 @@
 // MIT license: https://d20.zip/license.txt
 
-import { CANNON } from './vendor.js';
+import { RAPIER } from './vendor.js';
+import { PHYSICS } from './constants.js';
 
 export class World {
-    cannonWorld: CANNON.World;
-    diceMaterial: CANNON.Material;
-    wallMaterial: CANNON.Material;
-    floorMaterial: CANNON.Material;
+    rapierWorld: RAPIER.World;
 
     constructor() {
-        this.cannonWorld = new CANNON.World();
-        this.cannonWorld.allowSleep = true;
-        this.cannonWorld.gravity.set(0, -48, 0);
-        this.cannonWorld.broadphase = new CANNON.NaiveBroadphase();
+        const gravity = PHYSICS.GRAVITY;
+        this.rapierWorld = new RAPIER.World(gravity);
 
-        const solver = new CANNON.GSSolver();
-        solver.iterations = 240;
-        solver.tolerance = 0.01;
-        this.cannonWorld.solver = new CANNON.SplitSolver(solver);
+        // Optimize integration parameters for dice rolling
+        // Higher iterations reduce jitter when dice are stacked
+        this.rapierWorld.integrationParameters.maxVelocityIterations = PHYSICS.MAX_VELOCITY_ITERATIONS;
+        this.rapierWorld.integrationParameters.maxVelocityFrictionIterations = PHYSICS.MAX_VELOCITY_FRICTION_ITERATIONS;
+        this.rapierWorld.integrationParameters.maxStabilizationIterations = PHYSICS.MAX_STABILIZATION_ITERATIONS;
 
-        // Materials
-        this.floorMaterial = new CANNON.Material('floor');
-        this.diceMaterial = new CANNON.Material('dice');
-        this.wallMaterial = new CANNON.Material('wall');
-
-        // Default contact material (used if no other match is found)
-        const defaultContactMaterial = new CANNON.ContactMaterial(this.floorMaterial, this.floorMaterial, {
-            friction: 0.9,
-            restitution: 0.1,
-            contactEquationStiffness: 1e8,
-            contactEquationRelaxation: 10,
-            frictionEquationStiffness: 1e6,
-            frictionEquationRelaxation: 10,
-        });
-        this.cannonWorld.addContactMaterial(defaultContactMaterial);
-        this.cannonWorld.defaultContactMaterial = defaultContactMaterial;
-
-        // Dice vs Dice (Bouncy)
-        this.cannonWorld.addContactMaterial(
-            new CANNON.ContactMaterial(this.diceMaterial, this.diceMaterial, {
-                friction: 0.3,
-                restitution: 0.9,
-                contactEquationStiffness: 1e8,
-                contactEquationRelaxation: 10,
-                frictionEquationStiffness: 1e6,
-                frictionEquationRelaxation: 10,
-            })
-        );
-
-        // Dice vs Wall (Bouncy)
-        this.cannonWorld.addContactMaterial(
-            new CANNON.ContactMaterial(this.diceMaterial, this.wallMaterial, {
-                friction: 0.4,
-                restitution: 0.7,
-                contactEquationStiffness: 1e8,
-                contactEquationRelaxation: 10,
-                frictionEquationStiffness: 1e6,
-                frictionEquationRelaxation: 10,
-            })
-        );
-
-        // Dice vs Floor (Low bounciness)
-        this.cannonWorld.addContactMaterial(
-            new CANNON.ContactMaterial(this.diceMaterial, this.floorMaterial, {
-                friction: 0.7,
-                restitution: 0.2,
-                contactEquationStiffness: 1e8,
-                contactEquationRelaxation: 10,
-                frictionEquationStiffness: 1e6,
-                frictionEquationRelaxation: 10,
-            })
-        );
+        // Prediction distance and CCD substeps help with fast moving objects
+        this.rapierWorld.integrationParameters.predictionDistance = PHYSICS.PREDICTION_DISTANCE;
+        this.rapierWorld.integrationParameters.maxCcdSubsteps = PHYSICS.MAX_CCD_SUBSTEPS;
     }
 
     step(dt: number, timeSinceLastCalled?: number) {
-        this.cannonWorld.step(dt, timeSinceLastCalled, 20);
-    }
-
-    addBody(body: CANNON.Body) {
-        this.cannonWorld.addBody(body);
+        // Rapier uses a fixed timestep (default 1/60).
+        // Here we just call step. If dt is significantly larger than 1/60,
+        // we might want to call it multiple times, but let's keep it simple.
+        // Arguments are present to allow that optimization later if necessary.
+        this.rapierWorld.step();
     }
 }

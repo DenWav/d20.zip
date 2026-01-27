@@ -1,8 +1,22 @@
 // MIT license: https://d20.zip/license.txt
 
-import { THREE, CANNON, OrbitControls, Stats } from './vendor.js';
+import { THREE, RAPIER, OrbitControls, Stats } from './vendor.js';
 import { World } from './physics.js';
 import { getD2, getD4, getCube, getD8, getD10, getD12, getD20 } from './geometry.js';
+import {
+    MAX_DICE,
+    COLLISION_GROUPS,
+    PHYSICS,
+    TRAY,
+    SCENE,
+    DICE,
+    GEOMETRY,
+    UI,
+    STATE_SAVE_INTERVAL,
+    MATERIALS,
+} from './constants.js';
+
+await RAPIER.init();
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 
@@ -34,10 +48,15 @@ renderer.toneMappingExposure = 1.0;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x222222);
+scene.background = new THREE.Color(SCENE.BACKGROUND_COLOR);
 
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.set(0, 25, 15);
+const camera = new THREE.PerspectiveCamera(
+    SCENE.CAMERA.FOV,
+    window.innerWidth / window.innerHeight,
+    SCENE.CAMERA.NEAR,
+    SCENE.CAMERA.FAR
+);
+camera.position.set(SCENE.CAMERA.INITIAL_POS.x, SCENE.CAMERA.INITIAL_POS.y, SCENE.CAMERA.INITIAL_POS.z);
 camera.lookAt(0, 0, 0);
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -52,27 +71,31 @@ controls.enableDamping = true;
 controls.screenSpacePanning = false;
 
 // Lights
-const ambientLight = new THREE.AmbientLight(0xf2ebd8, 0.55);
+const ambientLight = new THREE.AmbientLight(SCENE.LIGHTS.AMBIENT.color, SCENE.LIGHTS.AMBIENT.intensity);
 scene.add(ambientLight);
 
-const directionalLight = new THREE.DirectionalLight(0xf0ebdd, 1.8);
-directionalLight.position.set(10, 20, 10);
+const directionalLight = new THREE.DirectionalLight(SCENE.LIGHTS.DIRECTIONAL.color, SCENE.LIGHTS.DIRECTIONAL.intensity);
+directionalLight.position.set(
+    SCENE.LIGHTS.DIRECTIONAL.position.x,
+    SCENE.LIGHTS.DIRECTIONAL.position.y,
+    SCENE.LIGHTS.DIRECTIONAL.position.z
+);
 directionalLight.castShadow = true;
-directionalLight.shadow.camera.left = -15;
-directionalLight.shadow.camera.right = 15;
-directionalLight.shadow.camera.top = 15;
-directionalLight.shadow.camera.bottom = -15;
-directionalLight.shadow.camera.near = 1;
-directionalLight.shadow.camera.far = 50;
-directionalLight.shadow.mapSize.width = 4096;
-directionalLight.shadow.mapSize.height = 4096;
-directionalLight.shadow.radius = 5;
-directionalLight.shadow.bias = -0.0001;
+directionalLight.shadow.camera.left = SCENE.LIGHTS.DIRECTIONAL.SHADOW.CAMERA.LEFT;
+directionalLight.shadow.camera.right = SCENE.LIGHTS.DIRECTIONAL.SHADOW.CAMERA.RIGHT;
+directionalLight.shadow.camera.top = SCENE.LIGHTS.DIRECTIONAL.SHADOW.CAMERA.TOP;
+directionalLight.shadow.camera.bottom = SCENE.LIGHTS.DIRECTIONAL.SHADOW.CAMERA.BOTTOM;
+directionalLight.shadow.camera.near = SCENE.LIGHTS.DIRECTIONAL.SHADOW.CAMERA.NEAR;
+directionalLight.shadow.camera.far = SCENE.LIGHTS.DIRECTIONAL.SHADOW.CAMERA.FAR;
+directionalLight.shadow.mapSize.width = SCENE.LIGHTS.DIRECTIONAL.SHADOW.MAP_SIZE;
+directionalLight.shadow.mapSize.height = SCENE.LIGHTS.DIRECTIONAL.SHADOW.MAP_SIZE;
+directionalLight.shadow.radius = SCENE.LIGHTS.DIRECTIONAL.SHADOW.RADIUS;
+directionalLight.shadow.bias = SCENE.LIGHTS.DIRECTIONAL.SHADOW.BIAS;
 scene.add(directionalLight);
 
 // Secondary light for more depth
-const fillLight = new THREE.DirectionalLight(0x446688, 0.5);
-fillLight.position.set(-10, 10, -10);
+const fillLight = new THREE.DirectionalLight(SCENE.LIGHTS.FILL.color, SCENE.LIGHTS.FILL.intensity);
+fillLight.position.set(SCENE.LIGHTS.FILL.position.x, SCENE.LIGHTS.FILL.position.y, SCENE.LIGHTS.FILL.position.z);
 scene.add(fillLight);
 
 // --- Seeded Random for Deterministic Assets ---
@@ -97,10 +120,10 @@ function createEnvironmentMap() {
     const mat = new THREE.ShaderMaterial({
         side: THREE.BackSide,
         uniforms: {
-            topColor: { value: new THREE.Color(0x333333) },
-            bottomColor: { value: new THREE.Color(0x111111) },
-            offset: { value: 33 },
-            exponent: { value: 0.6 },
+            topColor: { value: new THREE.Color(SCENE.ENVIRONMENT.TOP_COLOR) },
+            bottomColor: { value: new THREE.Color(SCENE.ENVIRONMENT.BOTTOM_COLOR) },
+            offset: { value: SCENE.ENVIRONMENT.OFFSET },
+            exponent: { value: SCENE.ENVIRONMENT.EXPONENT },
         },
         vertexShader: `
             varying vec3 vWorldPosition;
@@ -126,8 +149,11 @@ function createEnvironmentMap() {
     scene.add(mesh);
 
     // Add some random bright points to the env map for highlights
-    for (let i = 0; i < 12; i++) {
-        const light = new THREE.PointLight(0xffffff, 20);
+    for (let i = 0; i < SCENE.ENVIRONMENT.POINT_LIGHT_COUNT; i++) {
+        const light = new THREE.PointLight(
+            SCENE.ENVIRONMENT.POINT_LIGHT_COLOR,
+            SCENE.ENVIRONMENT.POINT_LIGHT_INTENSITY
+        );
         light.position.set((rng() - 0.5) * 2, rng() * 2, (rng() - 0.5) * 2);
         scene.add(light);
     }
@@ -146,23 +172,23 @@ const world = new World();
 function createDiceTexture() {
     const canvas = document.createElement('canvas');
     // 2048 is plenty for sharp numbers and saves memory
-    canvas.width = 2048;
+    canvas.width = DICE.TEXTURE.RES;
     canvas.height = canvas.width * 1.5; // 10 x 15 grid
     const ctx = canvas.getContext('2d')!;
 
     // Base color
-    ctx.fillStyle = '#eeeeee';
+    ctx.fillStyle = DICE.TEXTURE.BG_COLOR;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const gridSize = 10;
+    const gridSize = DICE.TEXTURE.GRID_SIZE;
     const cellSize = canvas.width / gridSize;
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     // Base font size (scaled for 2048 resolution)
     ctx.font = 'bold 80px Arial';
-    ctx.fillStyle = '#4c4c4c';
-    ctx.strokeStyle = '#4c4c4c';
+    ctx.fillStyle = DICE.TEXTURE.TEXT_COLOR;
+    ctx.strokeStyle = DICE.TEXTURE.TEXT_COLOR;
     ctx.lineCap = 'round';
 
     const drawUnderline = (x: number, y: number, text: string) => {
@@ -350,20 +376,20 @@ normalMapTexture.wrapT = THREE.RepeatWrapping;
 normalMapTexture.repeat.set(3, 3);
 
 const diceMaterial = new THREE.MeshPhysicalMaterial({
-    roughness: 0.75,
-    metalness: 0.6,
+    roughness: MATERIALS.DICE.ROUGHNESS,
+    metalness: MATERIALS.DICE.METALNESS,
     map: diceTexture,
     bumpMap: normalMapTexture,
-    bumpScale: 0.1,
+    bumpScale: MATERIALS.DICE.BUMP_SCALE,
     roughnessMap: diceTexture,
-    transmission: 0.4,
-    thickness: 2,
-    normalScale: new THREE.Vector2(0.8),
+    transmission: MATERIALS.DICE.TRANSMISSION,
+    thickness: MATERIALS.DICE.THICKNESS,
+    normalScale: new THREE.Vector2(MATERIALS.DICE.NORMAL_SCALE),
     normalMap: normalMapTexture,
     clearcoatNormalMap: normalMapTexture,
-    clearcoat: 1,
-    clearcoatRoughness: 2,
-    clearcoatNormalScale: new THREE.Vector2(0.2),
+    clearcoat: MATERIALS.DICE.CLEARCOAT,
+    clearcoatRoughness: MATERIALS.DICE.CLEARCOAT_ROUGHNESS,
+    clearcoatNormalScale: new THREE.Vector2(MATERIALS.DICE.CLEARCOAT_NORMAL_SCALE),
 });
 
 // --- UV Mapping and Face Detection ---
@@ -377,8 +403,8 @@ function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = f
     const uvs = new Float32Array(pos.count * 2);
     const faces: FaceInfo[] = [];
 
-    const gridSize = 10;
-    const gridHeight = 15;
+    const gridSize = DICE.TEXTURE.GRID_SIZE;
+    const gridHeight = DICE.TEXTURE.GRID_HEIGHT;
 
     // Group triangles by normal
     const uniqueNormals: THREE.Vector3[] = [];
@@ -660,29 +686,29 @@ function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = f
 }
 
 // Collision groups
-const COLLISION_GROUP_DICE = 1;
-const COLLISION_GROUP_GROUND = 2;
-const COLLISION_GROUP_WALLS = 4;
+const COLLISION_GROUP_DICE = COLLISION_GROUPS.DICE;
+const COLLISION_GROUP_GROUND = COLLISION_GROUPS.GROUND;
+const COLLISION_GROUP_WALLS = COLLISION_GROUPS.WALLS;
 
 // Floor & Walls Configuration
-const wallCount = 8;
-const wallLimit = 10;
-const floorThickness = 0.1;
-const wallHeight = 2.0;
-const wallThickness = 0.2;
+const wallCount = TRAY.WALL_COUNT;
+const wallLimit = TRAY.WALL_LIMIT;
+const floorThickness = TRAY.FLOOR_THICKNESS;
+const wallHeight = TRAY.WALL_HEIGHT;
+const wallThickness = TRAY.WALL_THICKNESS;
 const floorRadius = wallLimit / Math.cos(Math.PI / wallCount);
 
 // Floor for visual reference
 const floorMesh = new THREE.Mesh(
     new THREE.CylinderGeometry(floorRadius, floorRadius, floorThickness, wallCount),
     new THREE.MeshStandardMaterial({
-        color: 0x3c69a0, // Adjusted blue to compensate for texture base
+        color: SCENE.FLOOR_COLOR, // Adjusted blue to compensate for texture base
         map: feltTexture,
         bumpMap: feltTexture,
-        bumpScale: 2,
-        roughness: 2,
+        bumpScale: MATERIALS.FLOOR.BUMP_SCALE,
+        roughness: MATERIALS.FLOOR.ROUGHNESS,
         roughnessMap: feltTexture,
-        metalness: 0.0,
+        metalness: MATERIALS.FLOOR.METALNESS,
     })
 );
 floorMesh.position.y = -floorThickness / 2;
@@ -691,18 +717,17 @@ floorMesh.receiveShadow = true;
 scene.add(floorMesh);
 
 // Floor Physics
-const floorBody = new CANNON.Body({
-    mass: 0,
-    shape: new CANNON.Plane(),
-    material: world.floorMaterial,
-    collisionFilterGroup: COLLISION_GROUP_GROUND,
-    collisionFilterMask: COLLISION_GROUP_DICE,
-});
-floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
-world.addBody(floorBody);
+const physicsFloorThickness = TRAY.PHYSICS_FLOOR_THICKNESS;
+const floorDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(0, -physicsFloorThickness, 0);
+const floorBody = world.rapierWorld.createRigidBody(floorDesc);
+const floorColliderDesc = RAPIER.ColliderDesc.cuboid(floorRadius * 2, physicsFloorThickness, floorRadius * 2)
+    .setFriction(0.9)
+    .setRestitution(0.1)
+    .setCollisionGroups(COLLISION_GROUP_GROUND | (COLLISION_GROUP_DICE << 16));
+world.rapierWorld.createCollider(floorColliderDesc, floorBody);
 
 // Visual Walls & Physics Walls
-const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.5 });
+const wallMaterial = new THREE.MeshStandardMaterial({ color: SCENE.WALL_COLOR, roughness: MATERIALS.WALL.ROUGHNESS });
 const wallSideLength = 2 * floorRadius * Math.sin(Math.PI / wallCount);
 
 const wallInLen = 2 * (wallLimit - wallThickness / 2) * Math.tan(Math.PI / wallCount);
@@ -726,8 +751,8 @@ wallInstancedMesh.receiveShadow = true;
 wallInstancedMesh.frustumCulled = false;
 scene.add(wallInstancedMesh);
 
-const physicsWallThickness = 2.0;
-const physicsWallHeight = 150.0; // Much taller physics walls to prevent escape
+const physicsWallThickness = TRAY.PHYSICS_WALL_THICKNESS;
+const physicsWallHeight = TRAY.PHYSICS_WALL_HEIGHT; // Much taller physics walls to prevent escape
 
 for (let i = 0; i < wallCount; i++) {
     const angle = (i * 2 * Math.PI) / wallCount;
@@ -750,22 +775,25 @@ for (let i = 0; i < wallCount; i++) {
     const px = Math.cos(angle) * physicsCenterDist;
     const pz = Math.sin(angle) * physicsCenterDist;
 
-    const body = new CANNON.Body({
-        mass: 0,
-        shape: new CANNON.Box(
-            new CANNON.Vec3(wallSideLength / 2 + 1.0, physicsWallHeight / 2, physicsWallThickness / 2)
-        ),
-        material: world.wallMaterial,
-        collisionFilterGroup: COLLISION_GROUP_WALLS,
-        collisionFilterMask: COLLISION_GROUP_DICE,
-    });
-    body.position.set(px, physicsWallHeight / 2 - floorThickness, pz);
-    body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), Math.PI / 2 - angle);
-    world.cannonWorld.addBody(body);
+    const wallQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2 - angle);
+    const bodyDesc = RAPIER.RigidBodyDesc.fixed()
+        .setTranslation(px, physicsWallHeight / 2 - floorThickness, pz)
+        .setRotation(wallQuat);
+    const body = world.rapierWorld.createRigidBody(bodyDesc);
+    const wallColliderDesc = RAPIER.ColliderDesc.cuboid(
+        wallSideLength / 2 + 1.0,
+        physicsWallHeight / 2,
+        physicsWallThickness / 2
+    )
+        .setFriction(0.4)
+        .setRestitution(0.5)
+        .setCollisionGroups(COLLISION_GROUP_WALLS | (COLLISION_GROUP_DICE << 16));
+    world.rapierWorld.createCollider(wallColliderDesc, body);
 }
 
 interface Dice {
-    body: CANNON.Body;
+    body: RAPIER.RigidBody;
+    collider: RAPIER.Collider;
     mesh: THREE.Mesh;
     type: DiceType;
     faces: FaceInfo[];
@@ -783,7 +811,7 @@ class InstancedDiceManager {
     private instances: Map<string, THREE.InstancedMesh> = new Map();
     private frustum = new THREE.Frustum();
     private projScreenMatrix = new THREE.Matrix4();
-    private capacity = 256;
+    private capacity = MAX_DICE;
 
     constructor(
         private scene: THREE.Scene,
@@ -825,8 +853,8 @@ class InstancedDiceManager {
                 continue;
             }
 
-            dice.mesh.position.copy(dice.body.position as any);
-            dice.mesh.quaternion.copy(dice.body.quaternion as any);
+            dice.mesh.position.copy(dice.body.translation() as any);
+            dice.mesh.quaternion.copy(dice.body.rotation() as any);
             dice.mesh.updateMatrixWorld();
 
             if (this.frustum.intersectsObject(dice.mesh)) {
@@ -865,7 +893,7 @@ function showErrorMessage(message: string) {
         errorMessageTimeout = window.setTimeout(() => {
             errorEl.style.display = 'none';
             errorMessageTimeout = undefined;
-        }, 2000);
+        }, UI.ERROR_MESSAGE_TIMEOUT);
     }
 }
 
@@ -902,7 +930,7 @@ interface RollRecord {
     breakdown: string | null;
 }
 const rollHistory: RollRecord[] = [];
-const maxHistory = 20;
+const maxHistory = UI.MAX_HISTORY;
 
 function formatBreakdown(record: RollRecord): string {
     if (record.result === null) return 'Rolling...';
@@ -956,38 +984,21 @@ function addToHistory(formula: string, template: string, id: number, groups: Rol
 };
 
 function createConvexPolyhedron(geometry: THREE.BufferGeometry) {
-    const position = geometry.getAttribute('position');
-    const vertices: CANNON.Vec3[] = [];
-    const faces: number[][] = [];
-    const vertexMap = new Map<string, number>();
-
-    for (let i = 0; i < position.count; i += 3) {
-        const face: number[] = [];
-        for (let j = 0; j < 3; j++) {
-            const vx = position.getX(i + j);
-            const vy = position.getY(i + j);
-            const vz = position.getZ(i + j);
-
-            const key = `${vx.toFixed(4)},${vy.toFixed(4)},${vz.toFixed(4)}`;
-            let index = vertexMap.get(key);
-            if (index === undefined) {
-                index = vertices.length;
-                vertices.push(new CANNON.Vec3(vx, vy, vz));
-                vertexMap.set(key, index);
-            }
-            face.push(index);
-        }
-
-        faces.push(face);
+    const position = geometry.getAttribute('position') as THREE.BufferAttribute;
+    const vertices = new Float32Array(position.count * 3);
+    for (let i = 0; i < position.count; i++) {
+        vertices[i * 3] = position.getX(i);
+        vertices[i * 3 + 1] = position.getY(i);
+        vertices[i * 3 + 2] = position.getZ(i);
     }
-    return new CANNON.ConvexPolyhedron({ vertices, faces });
+    return RAPIER.ColliderDesc.convexHull(vertices) as RAPIER.ColliderDesc;
 }
 
 type DiceType = 'd2' | 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'd100';
 
 interface CachedDiceAsset {
     geometry: THREE.BufferGeometry;
-    shape: CANNON.Shape;
+    shape: RAPIER.ColliderDesc;
     faces: FaceInfo[];
 }
 
@@ -1031,11 +1042,16 @@ function getDiceAsset(type: DiceType, isTens: boolean): CachedDiceAsset {
     geometry.computeBoundingSphere();
     geometry.computeBoundingBox();
 
-    let shape: CANNON.Shape;
+    let shape: RAPIER.ColliderDesc;
     if (type === 'd6') {
-        shape = new CANNON.Box(new CANNON.Vec3(0.4, 0.4, 0.4));
+        shape = RAPIER.ColliderDesc.cuboid(
+            GEOMETRY.CUBE_RADIUS / 2,
+            GEOMETRY.CUBE_RADIUS / 2,
+            GEOMETRY.CUBE_RADIUS / 2
+        );
     } else if (type === 'd2') {
-        shape = new CANNON.Cylinder(0.8, 0.8, 0.075, 8);
+        const br = DICE.ROUND_RADIUS_COIN;
+        shape = RAPIER.ColliderDesc.roundCylinder(GEOMETRY.COIN_THICKNESS / 2 - br, GEOMETRY.COIN_RADIUS - br, br);
     } else {
         shape = createConvexPolyhedron(geometry);
     }
@@ -1068,61 +1084,29 @@ function createDice(
     const mesh = new THREE.Mesh(geometry, diceMaterial);
     // Note: mesh is not added to scene, we use InstancedMesh for rendering
 
-    const body = new CANNON.Body({
-        mass: 50,
-        linearDamping: 0.2,
-        angularDamping: 0.2,
-        allowSleep: true,
-        sleepSpeedLimit: 0.8,
-        sleepTimeLimit: 0.5,
-        material: world.diceMaterial,
-        collisionFilterGroup: COLLISION_GROUP_DICE,
-        collisionFilterMask: COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND,
-    });
+    const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
+        .setLinearDamping(type === 'd2' ? DICE.DAMPING.COIN : DICE.DAMPING.DEFAULT)
+        .setAngularDamping(type === 'd2' ? DICE.DAMPING.COIN : DICE.DAMPING.DEFAULT)
+        .setCanSleep(true)
+        .setCcdEnabled(true);
 
-    body.addShape(shape);
-
-    body.addEventListener('collide', (event: any) => {
-        if (event.body.material === world.wallMaterial) {
-            const contact = event.contact;
-            // contact.ni is the normal vector pointing from body b to body a.
-            // We want the impulse to point towards our dice (body).
-            let normal = contact.ni;
-            if (contact.bi !== body) {
-                normal = normal.clone().negate();
-            }
-
-            // Apply an additional "push" away from the wall
-            const pushMagnitude = 100; // mass is 50, so this adds 2m/s
-            const impulse = normal.clone().scale(pushMagnitude);
-            body.applyImpulse(impulse);
-
-            // Add some random angular momentum to help prevent dice from landing cocked
-            const spinMagnitude = 25;
-            body.angularVelocity.x += (Math.random() - 0.5) * spinMagnitude;
-            body.angularVelocity.y += (Math.random() - 0.5) * spinMagnitude;
-            body.angularVelocity.z += (Math.random() - 0.5) * spinMagnitude;
-        }
-    });
+    const body = world.rapierWorld.createRigidBody(bodyDesc);
+    const colliderDesc = (shape as RAPIER.ColliderDesc)
+        .setDensity(DICE.DENSITY)
+        .setFriction(DICE.FRICTION)
+        .setRestitution(type === 'd2' ? DICE.RESTITUTION.COIN : DICE.RESTITUTION.DEFAULT)
+        .setCollisionGroups(COLLISION_GROUP_DICE | ((COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND) << 16));
+    const collider = world.rapierWorld.createCollider(colliderDesc, body);
 
     let hasEnteredTray: boolean;
     if (initialState) {
-        body.position.set(initialState.position.x, initialState.position.y, initialState.position.z);
-        body.quaternion.set(
-            initialState.quaternion.x,
-            initialState.quaternion.y,
-            initialState.quaternion.z,
-            initialState.quaternion.w
-        );
-        body.velocity.set(initialState.velocity.x, initialState.velocity.y, initialState.velocity.z);
-        body.angularVelocity.set(
-            initialState.angularVelocity.x,
-            initialState.angularVelocity.y,
-            initialState.angularVelocity.z
-        );
+        body.setTranslation(initialState.position, true);
+        body.setRotation(initialState.quaternion, true);
+        body.setLinvel(initialState.velocity, true);
+        body.setAngvel(initialState.angularVelocity, true);
 
-        mesh.position.copy(body.position as any);
-        mesh.quaternion.copy(body.quaternion as any);
+        mesh.position.copy(initialState.position);
+        mesh.quaternion.copy(initialState.quaternion);
 
         if (initialState.isSettled) {
             body.sleep();
@@ -1146,29 +1130,31 @@ function createDice(
             finalAngle += offset;
         }
 
-        const spawnDistance = wallLimit * 1.4;
+        const spawnDistance = wallLimit * DICE.SPAWN.DISTANCE_MULTIPLIER;
         const spawnPos = new THREE.Vector3(
             Math.sin(finalAngle) * spawnDistance,
-            8.0 + Math.random() * 4.0,
+            DICE.SPAWN.HEIGHT_BASE + Math.random() * DICE.SPAWN.HEIGHT_VAR,
             Math.cos(finalAngle) * spawnDistance
         );
 
         // Add some random jitter to spawn position
-        spawnPos.x += (Math.random() - 0.5) * 4;
-        spawnPos.z += (Math.random() - 0.5) * 4;
+        spawnPos.x += (Math.random() - 0.5) * DICE.SPAWN.JITTER;
+        spawnPos.z += (Math.random() - 0.5) * DICE.SPAWN.JITTER;
 
-        body.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
+        body.setTranslation(spawnPos, true);
         mesh.position.copy(spawnPos);
 
+        let quat: THREE.Quaternion;
         if (type === 'd2') {
             // Coin starts flat (since we aligned the shape to Y axis)
-            body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), Math.random() * Math.PI * 2);
+            quat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() * Math.PI * 2);
         } else {
             const axis = new THREE.Vector3(Math.random(), Math.random(), Math.random()).normalize();
             const rotAngle = Math.random() * Math.PI * 2;
-            body.quaternion.setFromAxisAngle(new CANNON.Vec3(axis.x, axis.y, axis.z), rotAngle);
+            quat = new THREE.Quaternion().setFromAxisAngle(axis, rotAngle);
         }
-        mesh.quaternion.copy(body.quaternion as any);
+        body.setRotation(quat, true);
+        mesh.quaternion.copy(quat);
 
         // Velocity: towards the center area (with enough variation to prevent piling)
         // Use a centered target area to ensure dice hit the tray, with more spread for larger rolls.
@@ -1188,50 +1174,55 @@ function createDice(
         const angleVar = (Math.random() - 0.5) * 0.2; // +/- 0.1 radians
         horizontalDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), angleVar);
 
-        const speed = 15 + Math.random() * 10;
+        const speed = DICE.THROW.SPEED_BASE + Math.random() * DICE.THROW.SPEED_VAR;
         const velVec = horizontalDir.clone().multiplyScalar(speed);
 
         if (type === 'd2') {
             // Coin flip: significant upward velocity
-            velVec.y = 8 + Math.random() * 6;
+            velVec.y = DICE.THROW.COIN_UPWARD_BASE + Math.random() * DICE.THROW.COIN_UPWARD_VAR;
             // Removed horizontal speed penalty to encourage spreading out
         } else {
             // Slight upward arc for the throw
-            velVec.y = 2 + Math.random() * 6;
+            velVec.y = DICE.THROW.UPWARD_BASE + Math.random() * DICE.THROW.UPWARD_VAR;
         }
 
-        body.velocity.set(velVec.x, velVec.y, velVec.z);
+        body.setLinvel(velVec, true);
 
         // Ensure significant initial rotation (tumbling)
         if (type === 'd2') {
             // Flip the coin around a horizontal axis perpendicular to its movement
             const flipAxis = new THREE.Vector3(-horizontalDir.z, 0, horizontalDir.x);
-            const flipSpeed = 15 + Math.random() * 10;
-            body.angularVelocity.set(
-                flipAxis.x * flipSpeed + (Math.random() - 0.5) * 10,
-                (Math.random() - 0.5) * 20, // some side wobble
-                flipAxis.z * flipSpeed + (Math.random() - 0.5) * 10
-            );
+            const flipSpeed = DICE.FLIP.SPEED_BASE + Math.random() * DICE.FLIP.SPEED_VAR;
+            const angVel = {
+                x: flipAxis.x * flipSpeed + (Math.random() - 0.5) * 10,
+                y: (Math.random() - 0.5) * DICE.FLIP.SIDE_WOBBLE, // some side wobble
+                z: flipAxis.z * flipSpeed + (Math.random() - 0.5) * 10,
+            };
+            body.setAngvel(angVel, true);
         } else {
-            body.angularVelocity.set(
-                (Math.random() - 0.5) * 40,
-                (Math.random() - 0.5) * 40,
-                (Math.random() - 0.5) * 40
-            );
+            const angVel = {
+                x: (Math.random() - 0.5) * DICE.FLIP.DEFAULT_ANGVEL,
+                y: (Math.random() - 0.5) * DICE.FLIP.DEFAULT_ANGVEL,
+                z: (Math.random() - 0.5) * DICE.FLIP.DEFAULT_ANGVEL,
+            };
+            body.setAngvel(angVel, true);
         }
 
         const distSq = spawnPos.x * spawnPos.x + spawnPos.z * spawnPos.z;
         // Turn on wall collisions only if spawned safely inside (away from walls)
-        hasEnteredTray = distSq < (wallLimit - 1.0) * (wallLimit - 1.0);
+        hasEnteredTray =
+            distSq < (wallLimit - DICE.SAFE_ENTRY_DISTANCE_OFFSET) * (wallLimit - DICE.SAFE_ENTRY_DISTANCE_OFFSET);
     }
 
     if (hasEnteredTray) {
-        body.collisionFilterMask = COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND | COLLISION_GROUP_WALLS;
+        collider.setCollisionGroups(
+            COLLISION_GROUP_DICE | ((COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND | COLLISION_GROUP_WALLS) << 16)
+        );
     }
 
-    world.addBody(body);
     diceList.push({
         body,
+        collider,
         mesh,
         type,
         faces,
@@ -1433,7 +1424,7 @@ function evaluateMath(expr: string, placeholders?: Record<string, MathResult>): 
 
 (window as any).clearDice = () => {
     for (const dice of diceList) {
-        world.cannonWorld.removeBody(dice.body);
+        world.rapierWorld.removeRigidBody(dice.body);
     }
     diceList.length = 0;
     diceInstanceManager.reset();
@@ -1561,65 +1552,79 @@ function getDiceTypeFromSides(sides: number): DiceType | null {
     }
 
     // 3. Capacity check and cleanup
-    if (totalPhysicalDice > 256) {
-        showErrorMessage('Too many dice (limit: 256)');
+    if (totalPhysicalDice > MAX_DICE) {
+        showErrorMessage(`Too many dice (limit: ${MAX_DICE})`);
         return;
     }
     hideErrorMessage();
 
-    while (diceList.length + totalPhysicalDice > 256 && diceList.length > 0) {
+    while (diceList.length + totalPhysicalDice > MAX_DICE && diceList.length > 0) {
         const oldestRollId = diceList[0].rollId;
         while (diceList.length > 0 && diceList[0].rollId === oldestRollId) {
             const dice = diceList.shift();
             if (dice) {
-                world.cannonWorld.removeBody(dice.body);
+                world.rapierWorld.removeRigidBody(dice.body);
             }
         }
     }
 
     // 4. Prepare for spawning
-    const shuffledIndices = Array.from({ length: totalPhysicalDice }, (_, i) => i);
-    for (let i = shuffledIndices.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffledIndices[i], shuffledIndices[j]] = [shuffledIndices[j], shuffledIndices[i]];
+    interface DiceSpawnTask {
+        type: DiceType;
+        isTens: boolean;
+        groupIndex: number;
+        logicalIndex: number;
     }
 
-    let diceCounter = 0;
-    let cumulativeDelay = 0;
-
-    // 5. Spawn dice
+    const spawnTasks: DiceSpawnTask[] = [];
     groups.forEach((group, groupIndex) => {
         for (let i = 0; i < group.count; i++) {
             const logicalIndex = i;
             if (group.type === 'd100') {
-                const idx1 = shuffledIndices[diceCounter++];
-                const delay1 = cumulativeDelay;
-                cumulativeDelay += 10 + Math.random() * 10;
-                setTimeout(() => {
-                    createDice('d100', rollId, true, groupIndex, logicalIndex, idx1, totalPhysicalDice);
-                }, delay1);
-
-                const idx2 = shuffledIndices[diceCounter++];
-                const delay2 = cumulativeDelay;
-                cumulativeDelay += 10 + Math.random() * 10;
-                setTimeout(() => {
-                    createDice('d100', rollId, false, groupIndex, logicalIndex, idx2, totalPhysicalDice);
-                }, delay2);
+                spawnTasks.push({ type: 'd100', isTens: true, groupIndex, logicalIndex });
+                spawnTasks.push({ type: 'd100', isTens: false, groupIndex, logicalIndex });
             } else {
-                const idx = shuffledIndices[diceCounter++];
-                const delay = cumulativeDelay;
-                cumulativeDelay += 10 + Math.random() * 10;
-                const dType = group.type;
-                setTimeout(() => {
-                    createDice(dType, rollId, false, groupIndex, logicalIndex, idx, totalPhysicalDice);
-                }, delay);
+                spawnTasks.push({ type: group.type, isTens: false, groupIndex, logicalIndex });
             }
         }
+    });
+
+    shuffleArray(spawnTasks);
+
+    let cumulativeDelay = 0;
+
+    const shuffledIndices = Array.from({ length: totalPhysicalDice }, (_, i) => i);
+    shuffleArray(shuffledIndices);
+
+    // 5. Spawn dice
+    spawnTasks.forEach((task, i) => {
+        const delay = cumulativeDelay;
+        cumulativeDelay += DICE.SPAWN_DELAY_BASE + Math.random() * DICE.SPAWN_DELAY_VAR;
+        setTimeout(() => {
+            createDice(
+                task.type,
+                rollId,
+                task.isTens,
+                task.groupIndex,
+                task.logicalIndex,
+                shuffledIndices[i],
+                totalPhysicalDice
+            );
+        }, delay);
     });
 
     // 6. Add to history
     addToHistory(formula, template, rollId, groups);
 };
+
+function shuffleArray<T>(array: T[]) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = array[i];
+        array[i] = array[j];
+        array[j] = temp;
+    }
+}
 
 const formulaInput = document.getElementById('formula') as HTMLInputElement;
 if (formulaInput) {
@@ -1646,14 +1651,14 @@ window.addEventListener('resize', () => {
 });
 
 let lastTime = 0;
-const fixedStep = 1 / 60;
+const fixedStep = PHYSICS.FIXED_STEP;
 
 function pruneDiceList() {
     const historyIds = new Set(rollHistory.map((r) => r.id));
     for (let i = diceList.length - 1; i >= 0; i--) {
         const dice = diceList[i];
         if (!historyIds.has(dice.rollId)) {
-            world.cannonWorld.removeBody(dice.body);
+            world.rapierWorld.removeRigidBody(dice.body);
             diceList.splice(i, 1);
         }
     }
@@ -1663,7 +1668,21 @@ function updateDiceResults() {
     const rollsToUpdate = new Set<number>();
 
     for (const dice of diceList) {
-        if (dice.body.sleepState === CANNON.Body.SLEEPING) {
+        if (!dice.body.isSleeping()) {
+            const linvel = dice.body.linvel();
+            const angvel = dice.body.angvel();
+            const vsq = linvel.x * linvel.x + linvel.y * linvel.y + linvel.z * linvel.z;
+            const asq = angvel.x * angvel.x + angvel.y * angvel.y + angvel.z * angvel.z;
+
+            // Proactively sleep dice that are moving very slowly to prevent jitter
+            // D2 (coins) jitter violently, so they have a higher threshold
+            const sleepThreshold = dice.type === 'd2' ? DICE.SLEEP_THRESHOLD.COIN : DICE.SLEEP_THRESHOLD.DEFAULT;
+            if (vsq < sleepThreshold && asq < sleepThreshold) {
+                dice.body.sleep();
+            }
+        }
+
+        if (dice.body.isSleeping()) {
             if (!dice.isSettled) {
                 dice.isSettled = true;
 
@@ -1672,12 +1691,8 @@ function updateDiceResults() {
                 let minDot = Infinity;
                 let bestFaceValue = 0;
 
-                const worldQuat = new THREE.Quaternion(
-                    dice.body.quaternion.x,
-                    dice.body.quaternion.y,
-                    dice.body.quaternion.z,
-                    dice.body.quaternion.w
-                );
+                const rot = dice.body.rotation();
+                const worldQuat = new THREE.Quaternion(rot.x, rot.y, rot.z, rot.w);
 
                 for (const face of dice.faces) {
                     const worldNormal = face.normal.clone().applyQuaternion(worldQuat);
@@ -1815,26 +1830,27 @@ function saveState() {
             position: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
             target: { x: controls.target.x, y: controls.target.y, z: controls.target.z },
         },
-        dice: diceList.map((d) => ({
-            type: d.type,
-            rollId: d.rollId,
-            groupIndex: d.groupIndex,
-            logicalIndex: d.logicalIndex,
-            isTens: d.isTens,
-            position: { x: d.body.position.x, y: d.body.position.y, z: d.body.position.z },
-            quaternion: {
-                x: d.body.quaternion.x,
-                y: d.body.quaternion.y,
-                z: d.body.quaternion.z,
-                w: d.body.quaternion.w,
-            },
-            velocity: { x: d.body.velocity.x, y: d.body.velocity.y, z: d.body.velocity.z },
-            angularVelocity: { x: d.body.angularVelocity.x, y: d.body.angularVelocity.y, z: d.body.angularVelocity.z },
-            color: d.color.getHex(),
-            currentValue: d.currentValue,
-            isSettled: d.isSettled,
-            hasEnteredTray: d.hasEnteredTray,
-        })),
+        dice: diceList.map((d) => {
+            const pos = d.body.translation();
+            const rot = d.body.rotation();
+            const vel = d.body.linvel();
+            const angVel = d.body.angvel();
+            return {
+                type: d.type,
+                rollId: d.rollId,
+                groupIndex: d.groupIndex,
+                logicalIndex: d.logicalIndex,
+                isTens: d.isTens,
+                position: { x: pos.x, y: pos.y, z: pos.z },
+                quaternion: { x: rot.x, y: rot.y, z: rot.z, w: rot.w },
+                velocity: { x: vel.x, y: vel.y, z: vel.z },
+                angularVelocity: { x: angVel.x, y: angVel.y, z: angVel.z },
+                color: d.color.getHex(),
+                currentValue: d.currentValue,
+                isSettled: d.isSettled,
+                hasEnteredTray: d.hasEnteredTray,
+            };
+        }),
     };
     localStorage.setItem('d20_state', JSON.stringify(state));
 }
@@ -1899,15 +1915,22 @@ function animate(time: number = 0) {
     lastTime = time;
 
     controls.update();
-    world.step(fixedStep, Math.min(dt, 0.1));
+    world.step(fixedStep, Math.min(dt, PHYSICS.MAX_DT));
 
     for (const dice of diceList) {
         if (!dice.hasEnteredTray) {
-            const distSq = dice.body.position.x * dice.body.position.x + dice.body.position.z * dice.body.position.z;
+            const pos = dice.body.translation();
+            const distSq = pos.x * pos.x + pos.z * pos.z;
             // Use a safer threshold to avoid sudden wall collisions
-            if (distSq < (wallLimit - 1.0) * (wallLimit - 1.0)) {
+            if (
+                distSq <
+                (wallLimit - DICE.SAFE_ENTRY_DISTANCE_OFFSET) * (wallLimit - DICE.SAFE_ENTRY_DISTANCE_OFFSET)
+            ) {
                 dice.hasEnteredTray = true;
-                dice.body.collisionFilterMask = COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND | COLLISION_GROUP_WALLS;
+                dice.collider.setCollisionGroups(
+                    COLLISION_GROUP_DICE |
+                        ((COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND | COLLISION_GROUP_WALLS) << 16)
+                );
             }
         }
     }
@@ -1925,7 +1948,7 @@ function animate(time: number = 0) {
 
 window.addEventListener('beforeunload', saveState);
 // Periodic save for camera/physics state
-setInterval(saveState, 1000);
+setInterval(saveState, STATE_SAVE_INTERVAL);
 
 loadState();
 animate();

@@ -1,6 +1,7 @@
 // MIT license: https://d20.zip/license.txt
 
 import { THREE } from './vendor.js';
+import { GEOMETRY } from './constants.js';
 
 function toBufferGeometry(vertices: Float32Array, normals: Float32Array, indices: Uint16Array) {
     const geometry = new THREE.BufferGeometry();
@@ -37,19 +38,24 @@ function generateGeometry(v: number[], indices: number[]) {
 }
 
 export function getD2() {
-    return new THREE.CylinderGeometry(0.8, 0.8, 0.075, 32).toNonIndexed();
+    return new THREE.CylinderGeometry(
+        GEOMETRY.COIN_RADIUS,
+        GEOMETRY.COIN_RADIUS,
+        GEOMETRY.COIN_THICKNESS,
+        32
+    ).toNonIndexed();
 }
 
 export function getD4() {
-    return new THREE.TetrahedronGeometry(0.8).toNonIndexed();
+    return new THREE.TetrahedronGeometry(GEOMETRY.D4_RADIUS).toNonIndexed();
 }
 
 export function getCube() {
-    return new THREE.BoxGeometry(0.8, 0.8, 0.8).toNonIndexed();
+    return new THREE.BoxGeometry(GEOMETRY.CUBE_RADIUS, GEOMETRY.CUBE_RADIUS, GEOMETRY.CUBE_RADIUS).toNonIndexed();
 }
 
 export function getD8() {
-    return new THREE.OctahedronGeometry(0.8).toNonIndexed();
+    return new THREE.OctahedronGeometry(GEOMETRY.D8_RADIUS).toNonIndexed();
 }
 
 export function getD10() {
@@ -58,9 +64,9 @@ export function getD10() {
     const indices: number[] = [];
 
     const cos36 = Math.cos(Math.PI / 5);
-    const H = 0.8; // Pole height (reduced from 1.0 to fix stretched appearance)
+    const H = GEOMETRY.D10_RADIUS;
     const h = (H * (1 - cos36)) / (1 + cos36); // Offset for a perfectly flat pentagonal trapezohedron
-    const R = 0.8; // Radius
+    const R = GEOMETRY.D10_RADIUS;
 
     // North pole
     vertices.push(0, H, 0); // index 0
@@ -98,9 +104,9 @@ export function getD10() {
 }
 
 export function getD12() {
-    return new THREE.DodecahedronGeometry(0.8).toNonIndexed();
+    return new THREE.DodecahedronGeometry(GEOMETRY.D12_RADIUS).toNonIndexed();
 }
 
 export function getD20() {
-    return new THREE.IcosahedronGeometry(0.9).toNonIndexed();
+    return new THREE.IcosahedronGeometry(GEOMETRY.D20_RADIUS).toNonIndexed();
 }
