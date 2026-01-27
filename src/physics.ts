@@ -35,34 +35,40 @@ export class World {
         this.cannonWorld.defaultContactMaterial = defaultContactMaterial;
 
         // Dice vs Dice (Bouncy)
-        this.cannonWorld.addContactMaterial(new CANNON.ContactMaterial(this.diceMaterial, this.diceMaterial, {
-            friction: 0.9,
-            restitution: 0.7,
-            contactEquationStiffness: 1e8,
-            contactEquationRelaxation: 10,
-            frictionEquationStiffness: 1e6,
-            frictionEquationRelaxation: 10,
-        }));
+        this.cannonWorld.addContactMaterial(
+            new CANNON.ContactMaterial(this.diceMaterial, this.diceMaterial, {
+                friction: 0.9,
+                restitution: 0.7,
+                contactEquationStiffness: 1e8,
+                contactEquationRelaxation: 10,
+                frictionEquationStiffness: 1e6,
+                frictionEquationRelaxation: 10,
+            })
+        );
 
         // Dice vs Wall (Bouncy)
-        this.cannonWorld.addContactMaterial(new CANNON.ContactMaterial(this.diceMaterial, this.wallMaterial, {
-            friction: 0.9,
-            restitution: 0.7,
-            contactEquationStiffness: 1e8,
-            contactEquationRelaxation: 10,
-            frictionEquationStiffness: 1e6,
-            frictionEquationRelaxation: 10,
-        }));
+        this.cannonWorld.addContactMaterial(
+            new CANNON.ContactMaterial(this.diceMaterial, this.wallMaterial, {
+                friction: 0.9,
+                restitution: 0.7,
+                contactEquationStiffness: 1e8,
+                contactEquationRelaxation: 10,
+                frictionEquationStiffness: 1e6,
+                frictionEquationRelaxation: 10,
+            })
+        );
 
         // Dice vs Floor (Low bounciness)
-        this.cannonWorld.addContactMaterial(new CANNON.ContactMaterial(this.diceMaterial, this.floorMaterial, {
-            friction: 0.9,
-            restitution: 0.1,
-            contactEquationStiffness: 1e8,
-            contactEquationRelaxation: 10,
-            frictionEquationStiffness: 1e6,
-            frictionEquationRelaxation: 10,
-        }));
+        this.cannonWorld.addContactMaterial(
+            new CANNON.ContactMaterial(this.diceMaterial, this.floorMaterial, {
+                friction: 0.9,
+                restitution: 0.1,
+                contactEquationStiffness: 1e8,
+                contactEquationRelaxation: 10,
+                frictionEquationStiffness: 1e6,
+                frictionEquationRelaxation: 10,
+            })
+        );
     }
 
     step(dt: number, timeSinceLastCalled?: number) {

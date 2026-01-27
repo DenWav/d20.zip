@@ -833,6 +833,30 @@ const diceInstanceManager = new InstancedDiceManager(scene, diceMaterial);
 
 const diceList: Dice[] = [];
 let nextRollId = 0;
+let errorMessageTimeout: number | undefined;
+
+function showErrorMessage() {
+    const errorEl = document.getElementById('error-message');
+    if (errorEl) {
+        errorEl.style.display = 'block';
+        if (errorMessageTimeout) clearTimeout(errorMessageTimeout);
+        errorMessageTimeout = window.setTimeout(() => {
+            errorEl.style.display = 'none';
+            errorMessageTimeout = undefined;
+        }, 2000);
+    }
+}
+
+function hideErrorMessage() {
+    const errorEl = document.getElementById('error-message');
+    if (errorEl) {
+        errorEl.style.display = 'none';
+        if (errorMessageTimeout) {
+            clearTimeout(errorMessageTimeout);
+            errorMessageTimeout = undefined;
+        }
+    }
+}
 
 interface RollGroup {
     type: DiceType;
@@ -1342,6 +1366,35 @@ function evaluateMath(expr: string): number {
         if (typeSupported) {
             totalPhysicalDice += sides === 100 ? count * 2 : count;
         }
+    }
+
+    if (totalPhysicalDice > 256) {
+        showErrorMessage();
+        return;
+    }
+
+    hideErrorMessage();
+
+    // Remove oldest rolls to make room
+    let removedFromHistory = false;
+    while (diceList.length + totalPhysicalDice > 256 && diceList.length > 0) {
+        const oldestRollId = diceList[0].rollId;
+        while (diceList.length > 0 && diceList[0].rollId === oldestRollId) {
+            const dice = diceList.shift();
+            if (dice) {
+                world.cannonWorld.removeBody(dice.body);
+            }
+        }
+        const historyIndex = rollHistory.findIndex((r) => r.id === oldestRollId);
+        if (historyIndex !== -1) {
+            rollHistory.splice(historyIndex, 1);
+            removedFromHistory = true;
+        }
+    }
+
+    if (removedFromHistory) {
+        updateHistoryUI();
+        saveState();
     }
 
     let groupCounter = 0;
