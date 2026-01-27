@@ -1,3 +1,5 @@
+// MIT license: https://d20.zip/license.txt
+
 import { THREE, CANNON, OrbitControls, Stats } from './vendor.js';
 import { World } from './physics.js';
 import { getD2, getD4, getCube, getD8, getD10, getD12, getD20 } from './geometry.js';

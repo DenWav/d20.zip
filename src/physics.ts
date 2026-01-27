@@ -1,3 +1,5 @@
+// MIT license: https://d20.zip/license.txt
+
 import { CANNON } from './vendor.js';
 
 export class World {

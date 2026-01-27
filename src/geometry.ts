@@ -1,3 +1,5 @@
+// MIT license: https://d20.zip/license.txt
+
 import { THREE } from './vendor.js';
 
 function toBufferGeometry(vertices: Float32Array, normals: Float32Array, indices: Uint16Array) {
