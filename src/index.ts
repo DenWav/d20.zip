@@ -1548,7 +1548,6 @@ function getDiceTypeFromSides(sides: number): DiceType | null {
     }
     hideErrorMessage();
 
-    let removedFromHistory = false;
     while (diceList.length + totalPhysicalDice > 256 && diceList.length > 0) {
         const oldestRollId = diceList[0].rollId;
         while (diceList.length > 0 && diceList[0].rollId === oldestRollId) {
@@ -1557,16 +1556,6 @@ function getDiceTypeFromSides(sides: number): DiceType | null {
                 world.cannonWorld.removeBody(dice.body);
             }
         }
-        const historyIndex = rollHistory.findIndex((r) => r.id === oldestRollId);
-        if (historyIndex !== -1) {
-            rollHistory.splice(historyIndex, 1);
-            removedFromHistory = true;
-        }
-    }
-
-    if (removedFromHistory) {
-        updateHistoryUI();
-        saveState();
     }
 
     // 4. Prepare for spawning
