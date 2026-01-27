@@ -89,8 +89,8 @@ export const DICE = {
     FRICTION: 0.3,
     DENSITY: 1.0,
     SLEEP_THRESHOLD: {
-        DEFAULT: 0.01,
-        COIN: 0.75,
+        DEFAULT: 0.00001,
+        COIN: 0.00001,
     },
     SPAWN: {
         HEIGHT_BASE: 8.0,
