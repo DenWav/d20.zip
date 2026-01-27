@@ -1654,8 +1654,14 @@ function loadState() {
 }
 
 const stats = new Stats();
-stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
+stats.showPanel(0);
 stats.dom.style.zIndex = '999';
+stats.dom.style.opacity = '0';
+stats.dom.addEventListener("click", () => {
+    stats.dom.style.opacity = stats.dom.style.opacity === '0' ? '1' : '0';
+    // Clicking cycles, set it back to 0
+    stats.showPanel(0);
+});
 document.body.appendChild(stats.dom);
 
 function animate(time: number = 0) {
