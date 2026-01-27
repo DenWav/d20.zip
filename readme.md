@@ -2,6 +2,18 @@
 
 Simple in-browser 3D dice roller.
 
+# Issues
+
+These are the issues with the current version, but I'm not planning on fixing them. They seem minor enough to not cause
+significant issues.
+
+- Due to quirks with the physics engine, dice sitting on top of each other tends to be jittery.
+- Dice sometimes land cocked, and a value is chosen based on what is most upright. In reality a cocked dice needs to be
+  re-thrown, but I don't think this system should be responsible for that.
+- It is possible, with huge rolls, to cause some dice to fall out of the container.
+- To keep the physics from being extremely jittery, relaxation is set fairly high. This can lead to dice occasionally
+  clipping.
+
 # License & Attribution
 
 Code licensed under [MIT](license.txt) (vibecoded via [JetBrains Junie](https://www.jetbrains.com/junie/)).
@@ -10,10 +22,12 @@ Code licensed under [MIT](license.txt) (vibecoded via [JetBrains Junie](https://
 experience with it.</sub>
 
 Libraries:
- * [three.js](https://threejs.org/) (3D engine)
- * [cannon-es](https://pmndrs.github.io/cannon-es/) (physics engine)
- * [stats.js](https://mrdoob.github.io/stats.js/) (performance monitor)
+
+- [three.js](https://threejs.org/) (3D engine)
+- [cannon-es](https://pmndrs.github.io/cannon-es/) (physics engine)
+- [stats.js](https://mrdoob.github.io/stats.js/) (performance monitor)
 
 Icons:
- * [Favicon created by Freepik - Flaticon](https://www.flaticon.com/free-icons/icosahedron)
- * [GitHub logo by GitHub](https://primer.style/octicons/)
+
+- [Favicon created by Freepik - Flaticon](https://www.flaticon.com/free-icons/icosahedron)
+- [GitHub logo by GitHub](https://primer.style/octicons/)

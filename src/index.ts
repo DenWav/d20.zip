@@ -837,9 +837,10 @@ const diceList: Dice[] = [];
 let nextRollId = 0;
 let errorMessageTimeout: number | undefined;
 
-function showErrorMessage() {
+function showErrorMessage(message: string) {
     const errorEl = document.getElementById('error-message');
     if (errorEl) {
+        errorEl.innerText = message;
         errorEl.style.display = 'block';
         if (errorMessageTimeout) clearTimeout(errorMessageTimeout);
         errorMessageTimeout = window.setTimeout(() => {
@@ -863,7 +864,7 @@ function hideErrorMessage() {
 interface RollGroup {
     type: DiceType;
     count: number;
-    keepType?: 'kh' | 'kl';
+    keepType?: 'kh' | 'kl' | 'ka';
     keepCount?: number;
 }
 
@@ -879,30 +880,14 @@ interface RollRecord {
     result: number | null;
     groups: RollGroup[];
     groupResults: (GroupResult | number)[][]; // Store actual values for each group
+    breakdown: string | null;
 }
 const rollHistory: RollRecord[] = [];
 const maxHistory = 20;
 
 function formatBreakdown(record: RollRecord): string {
     if (record.result === null) return 'Rolling...';
-
-    return record.template.replace(/__G(\d+)__/g, (_, idxStr) => {
-        const idx = parseInt(idxStr);
-        const vals = record.groupResults[idx];
-        if (!vals) return '?';
-        if (vals.length > 1 || (vals.length === 1 && (typeof vals[0] === 'number' || !vals[0].kept))) {
-            const parts = vals.map((v) => {
-                if (typeof v === 'number') return v.toString();
-                return v.kept ? v.value.toString() : `<del>${v.value}</del>`;
-            });
-            return `(${parts.join(' + ')})`;
-        } else if (vals.length === 1) {
-            const v = vals[0];
-            return typeof v === 'number' ? v.toString() : v.value.toString();
-        } else {
-            return '0';
-        }
-    });
+    return record.breakdown || '';
 }
 
 function updateHistoryUI() {
@@ -935,7 +920,7 @@ function updateHistoryUI() {
 }
 
 function addToHistory(formula: string, template: string, id: number, groups: RollGroup[]) {
-    rollHistory.unshift({ id, formula, template, result: null, groups, groupResults: [] });
+    rollHistory.unshift({ id, formula, template, result: null, groups, groupResults: [], breakdown: null });
     if (rollHistory.length > maxHistory) {
         rollHistory.pop();
     }
@@ -1242,10 +1227,17 @@ function createDice(
     });
 }
 
-function evaluateMath(expr: string): number {
-    const tokens = expr.match(/\d+\.?\d*|[+\-*/()]/g) || [];
-    const values: number[] = [];
+interface MathResult {
+    value: number;
+    breakdown: string;
+    expanded?: MathResult[];
+}
+
+function evaluateMath(expr: string, placeholders?: Record<string, MathResult>): MathResult {
+    const tokens = expr.match(/\d+\.?\d*|[a-z]+|__G\d+__|[+\-*/(),]/gi) || [];
+    const values: MathResult[] = [];
     const ops: string[] = [];
+    const argCountStack: number[] = [];
 
     const precedence: { [key: string]: number } = {
         '+': 1,
@@ -1255,39 +1247,146 @@ function evaluateMath(expr: string): number {
     };
 
     const applyOp = () => {
-        if (values.length < 2) return;
+        if (ops.length === 0) return;
         const op = ops.pop()!;
+        if (op.endsWith('(')) return;
+        if (values.length < 2) throw new Error('Invalid expression');
         const b = values.pop()!;
         const a = values.pop()!;
+        let res: number;
         switch (op) {
             case '+':
-                values.push(a + b);
+                res = a.value + b.value;
                 break;
             case '-':
-                values.push(a - b);
+                res = a.value - b.value;
                 break;
             case '*':
-                values.push(a * b);
+                res = a.value * b.value;
                 break;
             case '/':
-                values.push(a / b);
+                res = a.value / b.value;
                 break;
+            default:
+                throw new Error('Unknown operator: ' + op);
         }
+        values.push({
+            value: res,
+            breakdown: `${a.breakdown} ${op} ${b.breakdown}`,
+        });
     };
 
+    const applyFunc = (func: string, n: number) => {
+        if (values.length < n) throw new Error('Insufficient operands for function');
+        const args: MathResult[] = [];
+        for (let i = 0; i < n; i++) args.unshift(values.pop()!);
+
+        const f = func.toLowerCase();
+        let val: number;
+        let bd: string;
+
+        if (f === 'max' || f === 'min') {
+            const vList = args.map((a) => a.value);
+            val = f === 'max' ? Math.max(...vList) : Math.min(...vList);
+            let found = false;
+            const bds = args.map((a) => {
+                if (!found && a.value === val) {
+                    found = true;
+                    return a.breakdown;
+                }
+                return `<del>${a.breakdown}</del>`;
+            });
+            bd = `${f}(${bds.join(', ')})`;
+        } else if (f === 'avg') {
+            const vList = args.map((a) => a.value);
+            val = vList.length === 0 ? 0 : vList.reduce((s, x) => s + x, 0) / vList.length;
+            bd = `avg(${args.map((a) => a.breakdown).join(', ')})`;
+        } else {
+            throw new Error('Unknown function: ' + func);
+        }
+        values.push({ value: val, breakdown: bd });
+    };
+
+    let nextIsExpanded = false;
     for (let i = 0; i < tokens.length; i++) {
         const t = tokens[i];
-        if (!isNaN(parseFloat(t))) {
-            values.push(parseFloat(t));
-        } else if (t === '(') {
-            ops.push(t);
-        } else if (t === ')') {
-            while (ops.length && ops[ops.length - 1] !== '(') {
-                applyOp();
+
+        if (t === '*') {
+            const prev = i > 0 ? tokens[i - 1] : null;
+            const isUnary = !prev || /^[+\-*/(,]$/.test(prev);
+            if (isUnary) {
+                nextIsExpanded = true;
+                continue;
             }
-            ops.pop();
+        }
+
+        if (t.startsWith('__G')) {
+            const res = placeholders?.[t] || { value: 0, breakdown: '0' };
+            if (nextIsExpanded) {
+                const items = res.expanded || [res];
+                for (const item of items) values.push(item);
+                if (argCountStack.length > 0 && argCountStack[argCountStack.length - 1] > 0) {
+                    argCountStack[argCountStack.length - 1] += items.length - 1;
+                }
+                nextIsExpanded = false;
+            } else {
+                values.push(res);
+            }
+        } else if (!isNaN(parseFloat(t))) {
+            const res = { value: parseFloat(t), breakdown: t };
+            if (nextIsExpanded) {
+                values.push(res);
+                nextIsExpanded = false;
+            } else {
+                values.push(res);
+            }
+        } else if (/[a-z]+/i.test(t)) {
+            ops.push(t);
+        } else if (t === '(') {
+            ops.push(nextIsExpanded ? '*(' : '(');
+            nextIsExpanded = false;
+            argCountStack.push(i > 0 && /[a-z]+/i.test(tokens[i - 1]) ? 1 : 0);
+        } else if (t === ',') {
+            while (ops.length && !ops[ops.length - 1].endsWith('(')) applyOp();
+            if (argCountStack.length === 0 || argCountStack[argCountStack.length - 1] === 0) {
+                throw new Error('Unexpected comma');
+            }
+            argCountStack[argCountStack.length - 1]++;
+        } else if (t === ')') {
+            while (ops.length && !ops[ops.length - 1].endsWith('(')) applyOp();
+            if (ops.length === 0) throw new Error('Mismatched parentheses');
+            const openOp = ops.pop()!;
+            const shouldExpand = openOp === '*(';
+
+            const n = argCountStack.pop()!;
+            if (ops.length > 0 && /[a-z]+/i.test(ops[ops.length - 1])) {
+                applyFunc(ops.pop()!, n);
+                if (shouldExpand) {
+                    const res = values.pop()!;
+                    const items = res.expanded || [res];
+                    for (const item of items) values.push(item);
+                    if (argCountStack.length > 0 && argCountStack[argCountStack.length - 1] > 0) {
+                        argCountStack[argCountStack.length - 1] += items.length - 1;
+                    }
+                }
+            } else {
+                const inner = values.pop()!;
+                if (shouldExpand) {
+                    const items = inner.expanded || [inner];
+                    for (const item of items) values.push(item);
+                    if (argCountStack.length > 0 && argCountStack[argCountStack.length - 1] > 0) {
+                        argCountStack[argCountStack.length - 1] += items.length - 1;
+                    }
+                } else {
+                    values.push({ value: inner.value, breakdown: `(${inner.breakdown})`, expanded: inner.expanded });
+                }
+            }
         } else {
-            while (ops.length && ops[ops.length - 1] !== '(' && precedence[ops[ops.length - 1]] >= precedence[t]) {
+            while (
+                ops.length &&
+                !ops[ops.length - 1].endsWith('(') &&
+                precedence[ops[ops.length - 1]] >= (precedence[t] || 0)
+            ) {
                 applyOp();
             }
             ops.push(t);
@@ -1295,11 +1394,16 @@ function evaluateMath(expr: string): number {
     }
 
     while (ops.length) {
+        if (ops[ops.length - 1].endsWith('(')) throw new Error('Mismatched parentheses');
         applyOp();
     }
 
-    const result = values[0] || 0;
-    return Math.round(result * 10) / 10;
+    if (values.length > 1) throw new Error('Too many values');
+    const result = values[0] || { value: 0, breakdown: '0' };
+    return {
+        value: Math.round(result.value * 10) / 10,
+        breakdown: result.breakdown,
+    };
 }
 
 (window as any).rollDice = (type?: DiceType) => {
@@ -1379,7 +1483,12 @@ function getDiceTypeFromSides(sides: number): DiceType | null {
     const groups: RollGroup[] = [];
     let template = formula.toLowerCase();
 
-    const diceRegex = /(\d*)d(\d+)(kh|kl)?(\d*)/g;
+    // Pre-process functions wrapping single dice groups
+    template = template.replace(/max\s*\(\s*((\d*)d(\d+))\s*\)/g, '$1kh1');
+    template = template.replace(/min\s*\(\s*((\d*)d(\d+))\s*\)/g, '$1kl1');
+    template = template.replace(/avg\s*\(\s*((\d*)d(\d+))\s*\)/g, '$1ka');
+
+    const diceRegex = /(\d*)d(\d+)(kh|kl|ka)?(\d*)/g;
 
     // 1. Parse formula to identify groups and build template with placeholders
     template = template.replace(diceRegex, (match, p1, p2, p3, p4) => {
@@ -1388,9 +1497,10 @@ function getDiceTypeFromSides(sides: number): DiceType | null {
         const type = getDiceTypeFromSides(sides);
 
         if (type) {
-            const keepType = (p3 as 'kh' | 'kl' | undefined);
+            const keepType = p3 as 'kh' | 'kl' | 'ka' | undefined;
             const keepCountRaw = p4;
-            const keepCount = keepCountRaw === '' ? (keepType ? 1 : undefined) : parseInt(keepCountRaw);
+            const keepCount =
+                keepCountRaw === '' ? (keepType && keepType !== 'ka' ? 1 : undefined) : parseInt(keepCountRaw);
 
             const groupIndex = groups.length;
             groups.push({ type, count, keepType, keepCount });
@@ -1399,7 +1509,23 @@ function getDiceTypeFromSides(sides: number): DiceType | null {
         return match;
     });
 
-    if (groups.length === 0) return;
+    if (groups.length === 0) {
+        showErrorMessage('Invalid roll formula');
+        return;
+    }
+
+    const validationTemplate = template.replace(/__G\d+__/g, '0');
+    if (!/^[\d\s+\-/*().,a-z]*$/.test(validationTemplate)) {
+        showErrorMessage('Invalid roll formula');
+        return;
+    }
+
+    try {
+        evaluateMath(validationTemplate);
+    } catch (e) {
+        showErrorMessage('Invalid roll formula');
+        return;
+    }
 
     // 2. Calculate total physical dice
     let totalPhysicalDice = 0;
@@ -1409,7 +1535,7 @@ function getDiceTypeFromSides(sides: number): DiceType | null {
 
     // 3. Capacity check and cleanup
     if (totalPhysicalDice > 256) {
-        showErrorMessage();
+        showErrorMessage('Too many dice (limit: 256)');
         return;
     }
     hideErrorMessage();
@@ -1571,7 +1697,7 @@ function updateDiceResults() {
 
         const allSettled = rollDice.every((d) => d.isSettled);
         if (allSettled) {
-            const groupValues: number[] = [];
+            const placeholders: Record<string, MathResult> = {};
 
             record.groups.forEach((group, groupIdx) => {
                 const groupDice = rollDice.filter((d) => d.groupIndex === groupIdx);
@@ -1598,29 +1724,56 @@ function updateDiceResults() {
                     }
                 });
 
-                // Apply kh/kl logic
+                // Apply kh/kl/ka logic
                 let allResults = logicalDieResults.map((v) => ({ value: v, kept: true }));
-                if (group.keepType && group.keepCount !== undefined) {
-                    if (group.keepType === 'kh') {
-                        allResults.sort((a, b) => b.value - a.value);
+                if (group.keepType === 'ka') {
+                    record.groupResults[groupIdx] = allResults;
+                    const sum = allResults.reduce((a, b) => a + b.value, 0);
+                    const val = allResults.length > 0 ? sum / allResults.length : 0;
+                    const parts = allResults.map((v) => v.value.toString());
+                    placeholders[`__G${groupIdx}__`] = {
+                        value: val,
+                        breakdown: `avg(${parts.join(', ')})`,
+                        expanded: allResults.map((v) => ({ value: v.value, breakdown: v.value.toString() })),
+                    };
+                } else {
+                    if (group.keepType && group.keepCount !== undefined) {
+                        if (group.keepType === 'kh') {
+                            allResults.sort((a, b) => b.value - a.value);
+                        } else {
+                            allResults.sort((a, b) => a.value - b.value);
+                        }
+                        for (let i = group.keepCount; i < allResults.length; i++) {
+                            allResults[i].kept = false;
+                        }
+                    }
+                    record.groupResults[groupIdx] = allResults;
+                    const val = allResults.filter((r) => r.kept).reduce((a, b) => a + b.value, 0);
+                    const parts = allResults.map((v) => (v.kept ? v.value.toString() : `<del>${v.value}</del>`));
+                    let bd: string;
+                    if (parts.length > 1 || (parts.length === 1 && !allResults[0].kept)) {
+                        bd = `(${parts.join(' + ')})`;
                     } else {
-                        allResults.sort((a, b) => a.value - b.value);
+                        bd = parts[0] || '0';
                     }
-                    for (let i = group.keepCount; i < allResults.length; i++) {
-                        allResults[i].kept = false;
-                    }
+                    placeholders[`__G${groupIdx}__`] = {
+                        value: val,
+                        breakdown: bd,
+                        expanded: allResults
+                            .filter((r) => r.kept)
+                            .map((v) => ({ value: v.value, breakdown: v.value.toString() })),
+                    };
                 }
-
-                record.groupResults[groupIdx] = allResults;
-                groupValues.push(allResults.filter((r) => r.kept).reduce((a, b) => a + b.value, 0));
             });
 
-            const evalFormula = record.template.replace(/__G(\d+)__/g, (_, idxStr) => {
-                const idx = parseInt(idxStr);
-                return groupValues[idx] !== undefined ? groupValues[idx].toString() : '0';
-            });
-
-            record.result = evaluateMath(evalFormula);
+            try {
+                const res = evaluateMath(record.template, placeholders);
+                record.result = res.value;
+                record.breakdown = res.breakdown;
+            } catch (e) {
+                record.result = 0;
+                record.breakdown = 'Error';
+            }
             updateHistoryUI();
             saveState();
         }
@@ -1707,7 +1860,7 @@ const stats = new Stats();
 stats.showPanel(0);
 stats.dom.style.zIndex = '999';
 stats.dom.style.opacity = '0';
-stats.dom.addEventListener("click", () => {
+stats.dom.addEventListener('click', () => {
     stats.dom.style.opacity = stats.dom.style.opacity === '0' ? '1' : '0';
     // Clicking cycles, set it back to 0
     stats.showPanel(0);
