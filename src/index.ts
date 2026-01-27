@@ -962,7 +962,7 @@ function createConvexPolyhedron(geometry: THREE.BufferGeometry) {
             const vy = position.getY(i + j);
             const vz = position.getZ(i + j);
 
-            const key = `${Math.round(vx * 100)},${Math.round(vy * 100)},${Math.round(vz * 100)}`;
+            const key = `${vx.toFixed(4)},${vy.toFixed(4)},${vz.toFixed(4)}`;
             let index = vertexMap.get(key);
             if (index === undefined) {
                 index = vertices.length;
@@ -971,6 +971,7 @@ function createConvexPolyhedron(geometry: THREE.BufferGeometry) {
             }
             face.push(index);
         }
+
         faces.push(face);
     }
     return new CANNON.ConvexPolyhedron({ vertices, faces });
@@ -1028,7 +1029,6 @@ function getDiceAsset(type: DiceType, isTens: boolean): CachedDiceAsset {
     if (type === 'd6') {
         shape = new CANNON.Box(new CANNON.Vec3(0.4, 0.4, 0.4));
     } else if (type === 'd2') {
-        // Cannon Cylinder is oriented along Z axis by default
         shape = new CANNON.Cylinder(0.8, 0.8, 0.075, 8);
     } else {
         shape = createConvexPolyhedron(geometry);
