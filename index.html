@@ -26,6 +26,10 @@
     </head>
     <body>
         <canvas id="canvas"></canvas>
+        <div id="webgl-error" style="display: none">
+            <div style="font-size: 32px; font-weight: bold; margin-bottom: 20px">WebGL Error</div>
+            <div>WebGL is not supported or disabled in your browser. This application requires WebGL to run.</div>
+        </div>
         <div id="hamburger" onclick="window.toggleHistory()">☰</div>
         <div id="ui">
             <div id="error-message" style="display: none">Too many dice (limit: 256)</div>

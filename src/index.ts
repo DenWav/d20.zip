@@ -5,7 +5,26 @@ import { World } from './physics.js';
 import { getD2, getD4, getCube, getD8, getD10, getD12, getD20 } from './geometry.js';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+
+function showWebGLRootError() {
+    const webglErrorEl = document.getElementById('webgl-error');
+    if (webglErrorEl) {
+        webglErrorEl.style.display = 'block';
+    }
+}
+
+let renderer: THREE.WebGLRenderer;
+try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    if (!renderer.getContext()) {
+        // noinspection ExceptionCaughtLocallyJS - We aren't only catching this exception
+        throw new Error('WebGL context not available');
+    }
+} catch (e) {
+    showWebGLRootError();
+    throw e;
+}
+
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
