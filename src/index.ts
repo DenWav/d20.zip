@@ -1454,6 +1454,14 @@ function evaluateMath(expr: string, placeholders?: Record<string, MathResult>): 
     }
 };
 
+(window as any).toggleHelp = () => {
+    const helpModal = document.getElementById('help-modal');
+    if (helpModal) {
+        const isHidden = helpModal.style.display === 'none';
+        helpModal.style.display = isHidden ? 'flex' : 'none';
+    }
+};
+
 function getDiceTypeFromSides(sides: number): DiceType | null {
     switch (sides) {
         case 2:
@@ -1613,6 +1621,15 @@ if (formulaInput) {
         }
     });
 }
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const helpModal = document.getElementById('help-modal');
+        if (helpModal && helpModal.style.display !== 'none') {
+            (window as any).toggleHelp();
+        }
+    }
+});
 
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;

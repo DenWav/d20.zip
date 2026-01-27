@@ -101,7 +101,10 @@
                     </div>
                 </div>
                 <div class="dice-button-row">
-                    <input type="text" id="formula" placeholder="e.g. 2d20 + d4" />
+                    <div id="formula-wrapper">
+                        <input type="text" id="formula" placeholder="e.g. 2d20 + d4" />
+                        <button id="help-btn" onclick="window.toggleHelp()">?</button>
+                    </div>
                     <div class="dice-button-row" style="justify-content: left">
                         <button class="btn" onclick="window.rollFormula(document.getElementById('formula').value)">
                             Roll
@@ -143,6 +146,65 @@
             >Favicon created by Freepik - Flaticon</a
         >
         <a class="github-link" href="https://github.com/DenWav/d20.zip"><img src="github.svg" alt="GitHub Logo" /></a>
+        <div id="help-modal" style="display: none" onclick="if (event.target === this) window.toggleHelp();">
+            <div id="help-content">
+                <div id="help-close" onclick="window.toggleHelp()">✕</div>
+                <h3 style="margin-top: 0">Roll Formula Syntax</h3>
+                <ul style="padding-left: 20px; text-align: left; margin-bottom: 0">
+                    <li style="margin-bottom: 8px">
+                        <strong><span style="color: #fb3232">N</span>d<span style="color: #efcc68">S</span></strong
+                        >: Roll <span style="color: #fb3232">N</span> dice with
+                        <span style="color: #efcc68">S</span> sides (e.g. <code>2d20</code>).
+                    </li>
+                    <li style="margin-bottom: 8px">
+                        <strong
+                            >kh<span style="color: #fb3232">N</span> / kl<span style="color: #fb3232">N</span></strong
+                        >: Keep Highest or Lowest <span style="color: #fb3232">N</span> dice (e.g. <code>4d6kh3</code>).
+                    </li>
+                    <li style="margin-bottom: 8px">
+                        <strong>ka</strong>: Keep Average of the dice (e.g. <code>10d10ka</code>).
+                    </li>
+                    <li style="margin-bottom: 8px">
+                        <strong>min / max(a, b, ...)</strong>: Minimum or maximum of values.
+                    </li>
+                    <li style="margin-bottom: 8px"><strong>avg(a, b, ...)</strong>: Average of multiple values.</li>
+                    <li style="margin-bottom: 8px">
+                        <strong>* modifier</strong>: Expand dice group in functions (e.g. <code>max(*2d20, 10)</code>).
+                    </li>
+                    <li>
+                        <strong>Math</strong>: <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, and
+                        <code>()</code>.
+                    </li>
+                </ul>
+                <p>Example rolls:</p>
+                <ul style="padding-left: 20px; text-align: left; margin-bottom: 0">
+                    <li style="margin-bottom: 8px">
+                        <code>2d20kh1</code> or <code>max(2d20)</code>: roll 2d20s with advantage
+                    </li>
+                    <li style="margin-bottom: 8px">
+                        <code>2d20kl1</code> or <code>min(2d20)</code>: roll 2d20s with disadvantage
+                    </li>
+                    <li style="margin-bottom: 8px">
+                        <code>max(*2d20, 10)</code>: roll 2d20s with advantage, with a minimum value of 10
+                    </li>
+                    <li style="margin-bottom: 8px">
+                        <code>max(2d20, 10)</code>: roll 2d20s added together, with a minimum value of 10
+                    </li>
+                    <li style="margin-bottom: 8px">
+                        <code>max(*2d20, *4d12)</code>: roll 2d20s and 4d12s all together, take the highest of all of
+                        them
+                    </li>
+                    <li style="margin-bottom: 8px">
+                        <code>max(*2d20, 4d12)</code>: roll 2d20s and 4d12s, take the highest of either d20 individually
+                        or the 4d12s combined
+                    </li>
+                    <li style="margin-bottom: 8px">
+                        <code>(6d6 * d4) + 8</code>: roll 6d6s and multiply that value by a d4, and add 8 to the result
+                    </li>
+                    <li style="margin-bottom: 8px"><code>3d6 / 2</code>: roll 3d6s and divide the result by 2</li>
+                </ul>
+            </div>
+        </div>
         <script type="module" src="dist/index.js"></script>
     </body>
 </html>

@@ -35,8 +35,7 @@ canvas {
     width: 90px;
     height: 40px;
     pointer-events: auto;
-    background: rgba(0, 0, 0, 0.2);
-    background-image: none;
+    background: rgba(0, 0, 0, 0.2) none;
     appearance: none;
     -moz-appearance: none;
     border: 1px solid rgba(255, 255, 255, 0.3);
@@ -67,23 +66,106 @@ button::-moz-focus-inner {
     background: rgba(255, 255, 255, 0.3);
 }
 
+#formula-wrapper {
+    display: flex;
+    flex: 1;
+    position: relative;
+    margin: 2px;
+}
+
 #formula {
-    background: rgba(0, 0, 0, 0.2);
-    background-image: none;
+    background: rgba(0, 0, 0, 0.2) none;
     appearance: none;
     -moz-appearance: none;
     border: 1px solid rgba(255, 255, 255, 0.3);
     color: white;
-    padding: 0 10px;
+    padding: 0 35px 0 10px;
     height: 40px;
     flex: 1;
     border-radius: 5px;
     outline: none;
-    margin: 2px;
+    width: 100%;
     min-width: 25%;
     font-size: 14px;
     backdrop-filter: blur(5px);
     pointer-events: auto;
+}
+
+#help-btn {
+    position: absolute;
+    right: 10px;
+    top: calc(50% - 2px);
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: background 0.2s;
+    z-index: 10;
+}
+
+@media (hover: hover) {
+    #help-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+}
+
+#help-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50000;
+}
+
+#help-content {
+    background: rgba(30, 30, 30, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 30px;
+    border-radius: 10px;
+    max-width: 450px;
+    width: 90%;
+    position: relative;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+#help-close {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    cursor: pointer;
+    font-size: 24px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+@media (hover: hover) {
+    #help-close:hover {
+        opacity: 1;
+    }
+}
+
+#help-content code {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.9em;
 }
 
 #history {
@@ -282,8 +364,7 @@ button::-moz-focus-inner {
 }
 
 .re-roll-btn {
-    background: rgba(0, 0, 0, 0.2);
-    background-image: none;
+    background: rgba(0, 0, 0, 0.2) none;
     appearance: none;
     -moz-appearance: none;
     border: 1px solid rgba(255, 255, 255, 0.2);
@@ -346,8 +427,7 @@ button::-moz-focus-inner {
 }
 
 .sub-btn {
-    background: rgba(0, 0, 0, 0.2);
-    background-image: none;
+    background: rgba(0, 0, 0, 0.2) none;
     appearance: none;
     -moz-appearance: none;
     border: 1px solid rgba(255, 255, 255, 0.3);
