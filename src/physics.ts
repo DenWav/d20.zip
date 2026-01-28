@@ -25,11 +25,12 @@ export class World {
         this.eventQueue = new RAPIER.EventQueue(true);
     }
 
-    step(dt: number, timeSinceLastCalled?: number) {
-        // Rapier uses a fixed timestep (default 1/60).
-        // Here we just call step. If dt is significantly larger than 1/60,
-        // we might want to call it multiple times, but let's keep it simple.
-        // Arguments are present to allow that optimization later if necessary.
+    step(dt: number) {
+        // Rapier wants to use a fixed timestep (default 1/60).
+        // Our framerate varies based on browser performance and load, though, so that results in the simulation running
+        // at unpredictable rates. This probably isn't a good idea, but it seems to work to adjust the dt every step
+        // based on our current fame rate.
+        this.rapierWorld.integrationParameters.dt = dt;
         this.rapierWorld.step(this.eventQueue);
     }
 }

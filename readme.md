@@ -8,7 +8,7 @@ These are the issues with the current version, but I'm not planning on fixing th
 significant issues.
 
 - Due to quirks with the physics engine, coins (D2s) sitting on top of each other is very jittery
-  - Only an issue when throwin a ridiculous amount of coins
+    - Only an issue when throwin a ridiculous amount of coins
 - Dice sometimes land cocked, and a value is chosen based on what is most upright. In reality a cocked dice needs to be
   re-thrown, but I don't think this system should be responsible for that.
 

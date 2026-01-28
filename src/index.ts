@@ -1682,7 +1682,6 @@ window.addEventListener('resize', () => {
 });
 
 let lastTime = 0;
-const fixedStep = PHYSICS.FIXED_STEP;
 
 function pruneDiceList() {
     const historyIds = new Set(rollHistory.map((r) => r.id));
@@ -2052,7 +2051,7 @@ function animate(time: number = 0) {
     lastTime = time;
 
     controls.update();
-    world.step(fixedStep, Math.min(dt, PHYSICS.MAX_DT));
+    world.step(Math.min(dt, PHYSICS.FIXED_STEP));
 
     // Process collision events for sound
     processCollisions();
