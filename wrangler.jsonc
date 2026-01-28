@@ -1,6 +1,0 @@
-{
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "d20-zip",
-  "pages_build_output_dir": "./dist",
-  "compatibility_date": "2022-07-12",
-}
