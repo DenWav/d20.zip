@@ -106,14 +106,15 @@
                 </div>
                 <div class="dice-button-row">
                     <div id="formula-wrapper">
+                        <label class="visually-hidden" for="formula">Roll formula</label>
                         <input type="text" id="formula" placeholder="e.g. 2d20 + d4" />
                         <button id="help-btn" onclick="window.toggleHelp()">?</button>
                     </div>
                     <div class="dice-button-row" style="justify-content: left">
-                        <button class="btn" onclick="window.rollFormula(document.getElementById('formula').value)">
+                        <button class="btn" onclick="window.rollFormula(document.getElementById('formula')['value'])">
                             Roll
                         </button>
-                        <button class="btn" onclick="window.clearAndRoll(document.getElementById('formula').value)">
+                        <button class="btn" onclick="window.clearAndRoll(document.getElementById('formula')['value'])">
                             Clear & Roll
                         </button>
                         <button class="btn btn-danger" onclick="window.clearDice()">Clear</button>
@@ -127,7 +128,7 @@
                     <input type="checkbox" id="audio-enabled" checked />
                     <span>Sound</span>
                 </label>
-                <label for="audio-volume">Volume</label>
+                <label class="visually-hidden" for="audio-volume">Volume</label>
                 <input type="range" id="audio-volume" min="0" max="100" value="40" />
                 <span id="audio-volume-value">40%</span>
             </div>
@@ -159,7 +160,7 @@
             >Favicon created by Freepik - Flaticon</a
         >
         <a class="github-link" href="https://github.com/DenWav/d20.zip"><img src="github.svg" alt="GitHub Logo" /></a>
-        <div id="help-modal" style="display: none" onclick="if (event.target === this) window.toggleHelp();">
+        <div id="help-modal" style="display: none" onclick="window.toggleHelp()">
             <div id="help-content">
                 <div id="help-close" onclick="window.toggleHelp()">✕</div>
                 <h3 style="margin-top: 0">Roll Formula Syntax</h3>
@@ -218,6 +219,7 @@
                 </ul>
             </div>
         </div>
+        <!--suppress HtmlUnknownTarget-->
         <script type="module" src="index.js"></script>
     </body>
 </html>

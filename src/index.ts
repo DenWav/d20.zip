@@ -1472,11 +1472,24 @@ function evaluateMath(expr: string, placeholders?: Record<string, MathResult>): 
     }
 };
 
+function blockEventPropagation(event: MouseEvent) {
+    if ((event.target as Element)?.id === 'help-close') {
+        (window as any).toggleHelp();
+        return;
+    }
+    event.stopPropagation();
+}
+
 (window as any).toggleHelp = () => {
     const helpModal = document.getElementById('help-modal');
     if (helpModal) {
         const isHidden = helpModal.style.display === 'none';
         helpModal.style.display = isHidden ? 'flex' : 'none';
+        if (isHidden) {
+            document.getElementById('help-content')?.addEventListener('click', blockEventPropagation, true);
+        } else {
+            document.getElementById('help-content')?.removeEventListener('click', blockEventPropagation, true);
+        }
     }
 };
 

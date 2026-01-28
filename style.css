@@ -191,15 +191,16 @@ button::-moz-focus-inner {
     padding: 15px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
+    flex-direction: row;
+    justify-content: space-between;
     align-items: center;
-    gap: 10px;
     font-size: 13px;
 }
 
 .audio-toggle {
     display: flex;
+    gap: 2px;
     align-items: center;
-    gap: 6px;
     cursor: pointer;
     white-space: nowrap;
 }
@@ -216,7 +217,7 @@ button::-moz-focus-inner {
 }
 
 #audio-volume {
-    flex: 1;
+    flex: 0.9;
     height: 4px;
     background: rgba(255, 255, 255, 0.2);
     border-radius: 2px;
@@ -257,7 +258,6 @@ button::-moz-focus-inner {
 }
 
 #audio-volume-value {
-    min-width: 38px;
     text-align: right;
     font-size: 12px;
     color: #aaa;
@@ -590,4 +590,16 @@ button::-moz-focus-inner {
 .github-link img {
     width: 28px;
     height: 28px;
+}
+
+.visually-hidden {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    position: absolute !important;
+    height: 1px;
+    width: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
 }
