@@ -12,16 +12,16 @@
         <meta property="og:url" content="https://d20.zip" />
         <meta property="og:title" content="d20.zip - 3D Dice Roller" />
         <meta property="og:description" content="A simple 3D dice roller in your browser" />
-        <meta property="og:image" content="https://d20.zip/banner.png" />
+        <meta property="og:image" content="https://d20.zip/assets/banner.png" />
 
         <!-- Twitter -->
         <meta property="twitter:card" content="summary_large_image" />
         <meta property="twitter:url" content="https://d20.zip" />
         <meta property="twitter:title" content="d20.zip - 3D Dice Roller" />
         <meta property="twitter:description" content="A simple 3D dice roller in your browser" />
-        <meta property="twitter:image" content="https://d20.zip/banner.png" />
+        <meta property="twitter:image" content="https://d20.zip/assets/banner.png" />
 
-        <link rel="icon" type="image/png" href="favicon.png" />
+        <link rel="icon" type="image/png" href="assets/favicon.png" />
         <link rel="stylesheet" href="style.css" />
     </head>
     <body>
@@ -111,10 +111,10 @@
                         <button id="help-btn" onclick="window.toggleHelp()">?</button>
                     </div>
                     <div class="dice-button-row" style="justify-content: left">
-                        <button class="btn" onclick="window.rollFormula(document.getElementById('formula')['value'])">
+                        <button class="btn" onclick="window.rollFormula(document.getElementById('formula').value)">
                             Roll
                         </button>
-                        <button class="btn" onclick="window.clearAndRoll(document.getElementById('formula')['value'])">
+                        <button class="btn" onclick="window.clearAndRoll(document.getElementById('formula').value)">
                             Clear & Roll
                         </button>
                         <button class="btn btn-danger" onclick="window.clearDice()">Clear</button>
@@ -159,7 +159,7 @@
         <a class="attribution" href="https://www.flaticon.com/free-icons/icosahedron" title="icosahedron icons"
             >Favicon created by Freepik - Flaticon</a
         >
-        <a class="github-link" href="https://github.com/DenWav/d20.zip"><img src="github.svg" alt="GitHub Logo" /></a>
+        <a class="github-link" href="https://github.com/DenWav/d20.zip"><img src="assets/github.svg" alt="GitHub Logo" /></a>
         <div id="help-modal" style="display: none" onclick="window.toggleHelp()">
             <div id="help-content">
                 <div id="help-close" onclick="window.toggleHelp()">✕</div>
@@ -219,7 +219,6 @@
                 </ul>
             </div>
         </div>
-        <!--suppress HtmlUnknownTarget-->
         <script type="module" src="index.js"></script>
     </body>
 </html>

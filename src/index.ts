@@ -375,7 +375,7 @@ function createFeltTexture() {
 const textureLoader = new THREE.TextureLoader();
 const diceTexture = createDiceTexture();
 const feltTexture = createFeltTexture();
-const normalMapTexture = textureLoader.load('normal.jpg');
+const normalMapTexture = textureLoader.load('assets/normal.jpg');
 normalMapTexture.wrapS = THREE.RepeatWrapping;
 normalMapTexture.wrapT = THREE.RepeatWrapping;
 normalMapTexture.repeat.set(3, 3);

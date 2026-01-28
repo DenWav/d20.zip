@@ -3,6 +3,7 @@
 
 .idea/
 dist/
+.wrangler/
 
 /node_modules
 npm-debug.log*
