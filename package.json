@@ -4,9 +4,12 @@
     "description": "",
     "main": "dist/index.js",
     "scripts": {
+        "clean": "rimraf dist",
+        "copy": "cpx \"{*.{html,css,png,jpg,svg},license.txt,audio/**,src/**}\" dist",
+        "copy:watch": "cpx \"{*.{html,css,png,jpg,svg},license.txt,audio/**,src/**}\" dist --watch",
         "compile": "tsc",
-        "build": "tsc && esbuild src/vendor.ts --bundle --minify --sourcemap --format=esm --outfile=dist/vendor.js",
-        "dev": "concurrently 'esbuild src/index.ts --bundle --outfile=dist/index.js --sourcemap --format=esm --watch' 'live-server --no-browser --ignore=.idea/**'",
+        "build": "tsc && esbuild src/vendor.ts --bundle --minify --sourcemap --format=esm --outfile=dist/vendor.js && npm run copy",
+        "dev": "concurrently 'esbuild src/index.ts --bundle --outfile=dist/index.js --sourcemap --format=esm --watch' 'npm run copy:watch' 'live-server --no-browser dist'",
         "format": "prettier --write ."
     },
     "dependencies": {
@@ -17,10 +20,13 @@
     "devDependencies": {
         "@types/three": "^0.182.0",
         "concurrently": "^9.2.1",
+        "cpx2": "^8.0.0",
         "esbuild": "^0.27.2",
-        "live-server": "^1.2.2",
+        "live-server": "^1.2.0",
         "prettier": "^3.8.1",
-        "typescript": "^5.5.3"
+        "rimraf": "^6.1.2",
+        "typescript": "^5.5.3",
+        "wrangler": "^4.61.0"
     },
     "private": true
 }
