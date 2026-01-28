@@ -5,6 +5,7 @@ import { PHYSICS } from './constants.js';
 
 export class World {
     rapierWorld: RAPIER.World;
+    eventQueue: RAPIER.EventQueue;
 
     constructor() {
         const gravity = PHYSICS.GRAVITY;
@@ -19,6 +20,9 @@ export class World {
         // Prediction distance and CCD substeps help with fast moving objects
         this.rapierWorld.integrationParameters.predictionDistance = PHYSICS.PREDICTION_DISTANCE;
         this.rapierWorld.integrationParameters.maxCcdSubsteps = PHYSICS.MAX_CCD_SUBSTEPS;
+
+        // Create event queue for collision events
+        this.eventQueue = new RAPIER.EventQueue(true);
     }
 
     step(dt: number, timeSinceLastCalled?: number) {
@@ -26,6 +30,6 @@ export class World {
         // Here we just call step. If dt is significantly larger than 1/60,
         // we might want to call it multiple times, but let's keep it simple.
         // Arguments are present to allow that optimization later if necessary.
-        this.rapierWorld.step();
+        this.rapierWorld.step(this.eventQueue);
     }
 }

@@ -164,3 +164,28 @@ export const GEOMETRY = {
     D12_RADIUS: 0.8,
     D20_RADIUS: 0.9,
 };
+
+export const SOUND = {
+    ENABLED: true,
+    DEFAULT_VOLUME: 0.5,
+    MIN_INTERVAL: 0.01, // Minimum time between sounds in seconds
+    MIN_VELOCITY: 1.0, // Minimum collision velocity to trigger sound
+    DICE_DICE: {
+        BASE_VOLUME: 0.7,
+        BASE_FREQ: 800,
+        DECAY: 0.06,
+        MATERIAL: 'glass', // glass or stone
+    },
+    DICE_FLOOR: {
+        BASE_VOLUME: 0.35,
+        BASE_FREQ: 150,
+        DECAY: 0.12,
+        MATERIAL: 'felt',
+    },
+    DICE_WALL: {
+        BASE_VOLUME: 0.3,
+        BASE_FREQ: 140,
+        DECAY: 0.1,
+        MATERIAL: 'felt',
+    },
+};

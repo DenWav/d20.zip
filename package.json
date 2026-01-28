@@ -4,8 +4,9 @@
     "description": "",
     "main": "dist/index.js",
     "scripts": {
+        "compile": "tsc",
         "build": "tsc && esbuild src/vendor.ts --bundle --minify --sourcemap --format=esm --outfile=dist/vendor.js",
-        "start": "npx serve .",
+        "dev": "concurrently 'esbuild src/index.ts --bundle --outfile=dist/index.js --sourcemap --format=esm --watch' 'live-server --no-browser --ignore=.idea/**'",
         "format": "prettier --write ."
     },
     "dependencies": {
@@ -15,7 +16,9 @@
     },
     "devDependencies": {
         "@types/three": "^0.182.0",
+        "concurrently": "^9.2.1",
         "esbuild": "^0.27.2",
+        "live-server": "^1.2.2",
         "prettier": "^3.8.1",
         "typescript": "^5.5.3"
     },

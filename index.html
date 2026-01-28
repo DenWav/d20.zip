@@ -122,6 +122,15 @@
             </div>
         </div>
         <div id="history">
+            <div id="audio-controls">
+                <label class="audio-toggle">
+                    <input type="checkbox" id="audio-enabled" checked />
+                    <span>Sound</span>
+                </label>
+                <label for="audio-volume">Volume</label>
+                <input type="range" id="audio-volume" min="0" max="100" value="40" />
+                <span id="audio-volume-value">40%</span>
+            </div>
             <div id="history-header-actions">
                 <button id="clear-history-btn" onclick="window.clearHistory()">Clear History</button>
                 <button id="reset-camera-btn" onclick="window.resetCamera()">Reset Camera</button>

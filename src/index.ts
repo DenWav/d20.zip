@@ -14,7 +14,9 @@ import {
     UI,
     STATE_SAVE_INTERVAL,
     MATERIALS,
+    SOUND,
 } from './constants.js';
+import { soundPool } from './audio.js';
 
 await RAPIER.init();
 
@@ -167,6 +169,9 @@ scene.environment.mapping = THREE.EquirectangularReflectionMapping;
 
 // Physics World
 const world = new World();
+
+// Store collision data with throttling
+const recentCollisions = new Map<string, number>(); // key -> last time
 
 // --- Dice Number Texture ---
 function createDiceTexture() {
@@ -723,7 +728,8 @@ const floorBody = world.rapierWorld.createRigidBody(floorDesc);
 const floorColliderDesc = RAPIER.ColliderDesc.cuboid(floorRadius * 2, physicsFloorThickness, floorRadius * 2)
     .setFriction(0.9)
     .setRestitution(0.1)
-    .setCollisionGroups(COLLISION_GROUP_GROUND | (COLLISION_GROUP_DICE << 16));
+    .setCollisionGroups(COLLISION_GROUP_GROUND | (COLLISION_GROUP_DICE << 16))
+    .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
 world.rapierWorld.createCollider(floorColliderDesc, floorBody);
 
 // Visual Walls & Physics Walls
@@ -787,7 +793,8 @@ for (let i = 0; i < wallCount; i++) {
     )
         .setFriction(0.4)
         .setRestitution(0.5)
-        .setCollisionGroups(COLLISION_GROUP_WALLS | (COLLISION_GROUP_DICE << 16));
+        .setCollisionGroups(COLLISION_GROUP_WALLS | (COLLISION_GROUP_DICE << 16))
+        .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
     world.rapierWorld.createCollider(wallColliderDesc, body);
 }
 
@@ -1095,7 +1102,8 @@ function createDice(
         .setDensity(DICE.DENSITY)
         .setFriction(DICE.FRICTION)
         .setRestitution(type === 'd2' ? DICE.RESTITUTION.COIN : DICE.RESTITUTION.DEFAULT)
-        .setCollisionGroups(COLLISION_GROUP_DICE | ((COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND) << 16));
+        .setCollisionGroups(COLLISION_GROUP_DICE | ((COLLISION_GROUP_DICE | COLLISION_GROUP_GROUND) << 16))
+        .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
     const collider = world.rapierWorld.createCollider(colliderDesc, body);
 
     let hasEnteredTray: boolean;
@@ -1635,6 +1643,29 @@ if (formulaInput) {
     });
 }
 
+// Audio controls
+const audioEnabledCheckbox = document.getElementById('audio-enabled') as HTMLInputElement;
+const audioVolumeSlider = document.getElementById('audio-volume') as HTMLInputElement;
+const audioVolumeValue = document.getElementById('audio-volume-value') as HTMLSpanElement;
+
+if (audioEnabledCheckbox) {
+    audioEnabledCheckbox.checked = soundPool.isEnabled();
+    audioEnabledCheckbox.addEventListener('change', () => {
+        soundPool.setEnabled(audioEnabledCheckbox.checked);
+    });
+}
+
+if (audioVolumeSlider && audioVolumeValue) {
+    audioVolumeSlider.value = soundPool.getVolume().toString();
+    audioVolumeValue.textContent = `${soundPool.getVolume()}%`;
+
+    audioVolumeSlider.addEventListener('input', () => {
+        const volume = parseInt(audioVolumeSlider.value, 10);
+        soundPool.setVolume(volume);
+        audioVolumeValue.textContent = `${volume}%`;
+    });
+}
+
 window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         const helpModal = document.getElementById('help-modal');
@@ -1660,6 +1691,88 @@ function pruneDiceList() {
         if (!historyIds.has(dice.rollId)) {
             world.rapierWorld.removeRigidBody(dice.body);
             diceList.splice(i, 1);
+        }
+    }
+}
+
+function processCollisions() {
+    if (!soundPool.isEnabled()) return;
+
+    const now = performance.now() / 1000;
+
+    world.eventQueue.drainCollisionEvents((handle1, handle2, started) => {
+        if (!started) return; // Only process collision start
+
+        // Find the colliders
+        const collider1 = world.rapierWorld.getCollider(handle1);
+        const collider2 = world.rapierWorld.getCollider(handle2);
+        if (!collider1 || !collider2) return;
+
+        // Get collision impulse
+        const body1 = collider1.parent();
+        const body2 = collider2.parent();
+        if (!body1 && !body2) return;
+
+        // Calculate relative velocity for volume
+        let velocity = 0;
+        if (body1 && !body1.isFixed()) {
+            const vel = body1.linvel();
+            velocity = Math.sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z);
+        }
+        if (body2 && !body2.isFixed()) {
+            const vel = body2.linvel();
+            velocity = Math.max(velocity, Math.sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z));
+        }
+
+        if (velocity < SOUND.MIN_VELOCITY) return;
+
+        // Determine collision type based on collision groups
+        const group1 = collider1.collisionGroups();
+        const group2 = collider2.collisionGroups();
+
+        const isDice1 = (group1 & COLLISION_GROUPS.DICE) !== 0;
+        const isDice2 = (group2 & COLLISION_GROUPS.DICE) !== 0;
+        const isGround1 = (group1 & COLLISION_GROUPS.GROUND) !== 0;
+        const isGround2 = (group2 & COLLISION_GROUPS.GROUND) !== 0;
+        const isWall1 = (group1 & COLLISION_GROUPS.WALLS) !== 0;
+        const isWall2 = (group2 & COLLISION_GROUPS.WALLS) !== 0;
+
+        let collisionType: 'dice-dice' | 'dice-floor' | 'dice-wall' | null = null;
+
+        if (isDice1 && isDice2) {
+            collisionType = 'dice-dice';
+        } else if ((isDice1 && isGround2) || (isDice2 && isGround1)) {
+            collisionType = 'dice-floor';
+        } else if ((isDice1 && isWall2) || (isDice2 && isWall1)) {
+            collisionType = 'dice-wall';
+        }
+
+        if (collisionType === 'dice-wall') {
+            // Check if any involved dice have entered the tray
+            // Only play sounds for dice that are visibly in the play area
+            const dice1 = diceList.find((d) => d.collider.handle === handle1);
+            const dice2 = diceList.find((d) => d.collider.handle === handle2);
+
+            if ((dice1 ?? dice2)!.body.translation().y > TRAY.WALL_HEIGHT) {
+                return;
+            }
+        }
+
+        if (!collisionType) return;
+
+        // Throttle sounds per collision pair
+        const key = `${Math.min(handle1, handle2)}-${Math.max(handle1, handle2)}`;
+        const lastTime = recentCollisions.get(key) || 0;
+        if (now - lastTime < SOUND.MIN_INTERVAL * 2) return; // Extra throttling per pair
+
+        recentCollisions.set(key, now);
+        soundPool.play(collisionType, velocity);
+    });
+
+    // Clean up old collision records (older than 1 second)
+    for (const [key, time] of recentCollisions.entries()) {
+        if (now - time > 1.0) {
+            recentCollisions.delete(key);
         }
     }
 }
@@ -1830,6 +1943,10 @@ function saveState() {
             position: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
             target: { x: controls.target.x, y: controls.target.y, z: controls.target.z },
         },
+        audio: {
+            enabled: soundPool.isEnabled(),
+            volume: soundPool.getVolume(),
+        },
         dice: diceList.map((d) => {
             const pos = d.body.translation();
             const rot = d.body.rotation();
@@ -1877,6 +1994,26 @@ function loadState() {
             controls.target.set(state.camera.target.x, state.camera.target.y, state.camera.target.z);
             controls.update();
         }
+        if (state.audio) {
+            if (state.audio.enabled !== undefined) {
+                soundPool.setEnabled(state.audio.enabled);
+                const audioEnabledCheckbox = document.getElementById('audio-enabled') as HTMLInputElement;
+                if (audioEnabledCheckbox) {
+                    audioEnabledCheckbox.checked = state.audio.enabled;
+                }
+            }
+            if (state.audio.volume !== undefined) {
+                soundPool.setVolume(state.audio.volume);
+                const audioVolumeSlider = document.getElementById('audio-volume') as HTMLInputElement;
+                const audioVolumeValue = document.getElementById('audio-volume-value') as HTMLSpanElement;
+                if (audioVolumeSlider) {
+                    audioVolumeSlider.value = state.audio.volume.toString();
+                }
+                if (audioVolumeValue) {
+                    audioVolumeValue.textContent = `${state.audio.volume}%`;
+                }
+            }
+        }
         if (state.dice) {
             for (const dState of state.dice) {
                 createDice(
@@ -1916,6 +2053,9 @@ function animate(time: number = 0) {
 
     controls.update();
     world.step(fixedStep, Math.min(dt, PHYSICS.MAX_DT));
+
+    // Process collision events for sound
+    processCollisions();
 
     for (const dice of diceList) {
         if (!dice.hasEnteredTray) {
