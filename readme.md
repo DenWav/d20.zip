@@ -7,8 +7,7 @@ Simple in-browser 3D dice roller.
 These are the issues with the current version, but I'm not planning on fixing them. They seem minor enough to not cause
 significant issues.
 
-- Due to quirks with the physics engine, coins (D2s) sitting on top of each other is very jittery
-    - Only an issue when throwin a ridiculous amount of coins
+- D2s should really be coins, but the phsyics engine struggles hard with thin flat objects, so I use D4s instead.
 - Dice sometimes land cocked, and a value is chosen based on what is most upright. In reality a cocked dice needs to be
   re-thrown, but I don't think this system should be responsible for that.
 

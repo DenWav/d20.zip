@@ -8,17 +8,6 @@ export const COLLISION_GROUPS = {
     WALLS: 4,
 };
 
-export const PHYSICS = {
-    GRAVITY: { x: 0.0, y: -48.0, z: 0.0 },
-    MAX_VELOCITY_ITERATIONS: 20,
-    MAX_VELOCITY_FRICTION_ITERATIONS: 20,
-    MAX_STABILIZATION_ITERATIONS: 20,
-    PREDICTION_DISTANCE: 0.01,
-    MAX_CCD_SUBSTEPS: 4,
-    FIXED_STEP: 1 / 60,
-    MAX_DT: 0.1,
-};
-
 export const TRAY = {
     WALL_COUNT: 8,
     WALL_LIMIT: 10,
@@ -78,20 +67,11 @@ export const SCENE = {
 };
 
 export const DICE = {
-    DAMPING: {
-        DEFAULT: 0.75,
-        COIN: 1.0,
-    },
-    RESTITUTION: {
-        DEFAULT: 0.4,
-        COIN: 0.00005,
-    },
+    DAMPING: 0.75,
+    RESTITUTION: 0.4,
     FRICTION: 0.3,
     DENSITY: 1.0,
-    SLEEP_THRESHOLD: {
-        DEFAULT: 0.00001,
-        COIN: 0.00001,
-    },
+    SLEEP_THRESHOLD: 0.00001,
     SPAWN: {
         HEIGHT_BASE: 8.0,
         HEIGHT_VAR: 4.0,
@@ -103,8 +83,6 @@ export const DICE = {
         SPEED_VAR: 10,
         UPWARD_BASE: 2,
         UPWARD_VAR: 6,
-        COIN_UPWARD_BASE: 8,
-        COIN_UPWARD_VAR: 6,
     },
     FLIP: {
         SPEED_BASE: 15,
@@ -119,7 +97,6 @@ export const DICE = {
         BG_COLOR: '#eeeeee',
         TEXT_COLOR: '#4c4c4c',
     },
-    ROUND_RADIUS_COIN: 0.005,
     SAFE_ENTRY_DISTANCE_OFFSET: 0.4,
     SPAWN_DELAY_BASE: 10,
     SPAWN_DELAY_VAR: 10,
@@ -155,8 +132,6 @@ export const UI = {
 export const STATE_SAVE_INTERVAL = 1000;
 
 export const GEOMETRY = {
-    COIN_RADIUS: 0.8,
-    COIN_THICKNESS: 0.075,
     D4_RADIUS: 0.8,
     CUBE_RADIUS: 0.8,
     D8_RADIUS: 0.8,

@@ -3,47 +3,17 @@
 import { THREE } from './vendor.js';
 import { GEOMETRY } from './constants.js';
 
-function toBufferGeometry(vertices: Float32Array, normals: Float32Array, indices: Uint16Array) {
+function toBufferGeometry(vertices: number[], indices: number[]) {
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-    geometry.setIndex(new THREE.BufferAttribute(indices, 1));
-    return geometry;
-}
-
-function generateGeometry(v: number[], indices: number[]) {
-    const vertices = new Float32Array(indices.length * 3);
-    const normals = new Float32Array(indices.length * 3);
-
-    for (let i = 0; i < indices.length; i += 3) {
-        const i1 = indices[i] * 3,
-            i2 = indices[i + 1] * 3,
-            i3 = indices[i + 2] * 3;
-        const v1 = [v[i1], v[i1 + 1], v[i1 + 2]];
-        const v2 = [v[i2], v[i2 + 1], v[i2 + 2]];
-        const v3 = [v[i3], v[i3 + 1], v[i3 + 2]];
-
-        vertices.set([...v1, ...v2, ...v3], i * 3);
-
-        // Calculate normal
-        const u = [v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2]];
-        const w = [v3[0] - v1[0], v3[1] - v1[1], v3[2] - v1[2]];
-        const n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
-        const l = Math.sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
-        const norm = l > 0 ? [n[0] / l, n[1] / l, n[2] / l] : [0, 0, 0];
-        normals.set([...norm, ...norm, ...norm], i * 3);
-    }
-
-    return toBufferGeometry(vertices, normals, new Uint16Array(indices.map((_, i) => i)));
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+    geometry.setIndex(new THREE.BufferAttribute(new Uint16Array(indices), 1));
+    const flatGeometry = geometry.toNonIndexed();
+    flatGeometry.computeVertexNormals();
+    return flatGeometry;
 }
 
 export function getD2() {
-    return new THREE.CylinderGeometry(
-        GEOMETRY.COIN_RADIUS,
-        GEOMETRY.COIN_RADIUS,
-        GEOMETRY.COIN_THICKNESS,
-        32
-    ).toNonIndexed();
+    return getD4();
 }
 
 export function getD4() {
@@ -100,7 +70,7 @@ export function getD10() {
         indices.push(1, 2 + ((i + 1) % sides), 7 + ((i + 1) % sides));
     }
 
-    return generateGeometry(vertices, indices);
+    return toBufferGeometry(vertices, indices);
 }
 
 export function getD12() {

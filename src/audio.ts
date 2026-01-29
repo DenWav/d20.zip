@@ -4,7 +4,7 @@ import { SOUND } from './constants.js';
 
 type CollisionType = 'dice-dice' | 'dice-floor' | 'dice-wall';
 
-class SoundPool {
+export class AudioManager {
     private audioContext: AudioContext | null = null;
     private lastPlayTime = 0;
     private enabled = SOUND.ENABLED;
@@ -13,7 +13,7 @@ class SoundPool {
     private loading = false;
     private volume: number = SOUND.DEFAULT_VOLUME;
 
-    constructor() {
+    public constructor() {
         // Set up event listeners for user interaction to initialize audio
         const initAudio = async () => {
             if (!this.initialized) {
@@ -27,6 +27,31 @@ class SoundPool {
         document.addEventListener('click', initAudio, { once: true });
         document.addEventListener('keydown', initAudio, { once: true });
         document.addEventListener('touchstart', initAudio, { once: true });
+    }
+
+    public setupUi() {
+        // Audio controls in UI
+        const audioEnabledCheckbox = document.getElementById('audio-enabled') as HTMLInputElement;
+        const audioVolumeSlider = document.getElementById('audio-volume') as HTMLInputElement;
+        const audioVolumeValue = document.getElementById('audio-volume-value') as HTMLSpanElement;
+
+        if (audioEnabledCheckbox) {
+            audioEnabledCheckbox.checked = this.isEnabled();
+            audioEnabledCheckbox.addEventListener('change', () => {
+                this.setEnabled(audioEnabledCheckbox.checked);
+            });
+        }
+
+        if (audioVolumeSlider && audioVolumeValue) {
+            audioVolumeSlider.value = this.getVolume().toString();
+            audioVolumeValue.textContent = `${this.getVolume()}%`;
+
+            audioVolumeSlider.addEventListener('input', () => {
+                const volume = parseInt(audioVolumeSlider.value, 10);
+                this.setVolume(volume);
+                audioVolumeValue.textContent = `${volume}%`;
+            });
+        }
     }
 
     private ensureAudioContext() {
@@ -62,7 +87,7 @@ class SoundPool {
         }
     }
 
-    play(type: CollisionType, velocity: number) {
+    public play(type: CollisionType, velocity: number) {
         if (!this.enabled || !this.initialized) return;
         if (velocity < SOUND.MIN_VELOCITY) return;
 
@@ -128,22 +153,20 @@ class SoundPool {
         }
     }
 
-    setEnabled(enabled: boolean) {
+    public setEnabled(enabled: boolean) {
         this.enabled = enabled;
     }
 
-    isEnabled(): boolean {
+    public isEnabled(): boolean {
         return this.enabled;
     }
 
-    setVolume(volume: number) {
+    public setVolume(volume: number) {
         // Volume is 0-100, convert to 0-1 and update volume
         this.volume = Math.max(0, Math.min(100, volume)) / 100;
     }
 
-    getVolume(): number {
+    public getVolume(): number {
         return Math.round(this.volume * 100);
     }
 }
-
-export const soundPool = new SoundPool();
