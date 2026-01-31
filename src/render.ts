@@ -4,6 +4,7 @@
 import { THREE, OrbitControls } from './vendor.js';
 import { SCENE } from './constants.js';
 import { mulberry32 } from './util.js';
+import { PCFShadowMap, PCFSoftShadowMap, VSMShadowMap } from 'three/src/constants';
 
 export class Renderer {
     public readonly renderer: THREE.WebGLRenderer = this.initRenderer();

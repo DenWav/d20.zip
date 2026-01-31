@@ -25,7 +25,7 @@ export const SCENE = Object.freeze({
     CAMERA: Object.freeze({
         FOV: 50,
         NEAR: 0.1,
-        FAR: 100,
+        FAR: 2000,
         INITIAL_POS: Object.freeze({ X: 0, Y: 25, Z: 15 }),
     }),
     LIGHTS: Object.freeze({

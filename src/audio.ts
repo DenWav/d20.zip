@@ -1,9 +1,17 @@
 // MIT license: https://d20.zip/license.txt
 // https://github.com/DenWav/d20.zip
 
-import { DiceSoundConstant, SOUND } from './constants.js';
+import { THREE } from './vendor.js';
+import { DiceSoundConstant, SCENE, SOUND } from './constants.js';
+import { Renderer } from './render.js';
 
 type CollisionType = 'dice-dice' | 'dice-floor' | 'dice-wall';
+
+const DEFAULT_DISTANCE: number = new THREE.Vector3(
+    SCENE.CAMERA.INITIAL_POS.X,
+    SCENE.CAMERA.INITIAL_POS.Y,
+    SCENE.CAMERA.INITIAL_POS.Z
+).lengthSq();
 
 export class AudioManager {
     private audioContext: AudioContext | null = null;
@@ -14,7 +22,7 @@ export class AudioManager {
     private loading = false;
     private volume: number = SOUND.DEFAULT_VOLUME;
 
-    public constructor() {
+    public constructor(private readonly renderer: Renderer) {
         // Set up event listeners for user interaction to initialize audio
         const initAudio = async () => {
             if (!this.initialized) {
@@ -134,7 +142,16 @@ export class AudioManager {
 
             // Volume scales with velocity but caps to avoid distortion
             const velocityVolume = Math.min(velocity / 15, 15);
-            const volume = config.BASE_VOLUME * velocityVolume * this.volume;
+            let volume = config.BASE_VOLUME * velocityVolume * this.volume;
+
+            // Adjust volume based on camera distance
+            const dist = Math.abs(this.renderer.camera.position.lengthSq());
+            const diff = Math.log(1 / (dist / DEFAULT_DISTANCE)); // initial divide inverted to prevent divide by 0
+            if (diff > 1) {
+                volume *= Math.min(diff, 1.5);
+            } else if (diff < 0) {
+                volume *= 1 / Math.min(-diff, 10);
+            }
 
             const gainNode = ctx.createGain();
             gainNode.gain.value = Math.min(volume * 2, 1.0);

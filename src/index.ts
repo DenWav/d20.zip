@@ -19,7 +19,7 @@ const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 
 const renderer = new Renderer(canvas);
 const physics = await Physics.new();
-const audio = new AudioManager();
+const audio = new AudioManager(renderer);
 
 const world = new World(renderer, physics, audio);
 Tray.initTray(world);
