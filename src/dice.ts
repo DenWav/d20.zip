@@ -220,6 +220,56 @@ interface FaceInfo {
     value: number;
 }
 
+// prettier-ignore
+const D8_MAPPINGS: Readonly<{ [key: number]: number }> = Object.freeze({
+    1: 1,   5: 4,
+    2: 3,   6: 2,
+    3: 7,   7: 6,
+    4: 5,   8: 8,
+});
+
+// prettier-ignore
+const D10_MAPPINGS: Readonly<{ [key: number]: number }> = Object.freeze({
+    0: 0,   5: 7,
+    1: 4,   6: 3,
+    2: 8,   7: 1,
+    3: 6,   8: 5,
+    4: 2,   9: 9,
+});
+
+// prettier-ignore
+const D12_MAPPINGS: Readonly<{ [key: number]: number }> = Object.freeze({
+    1: 1,   7: 11,
+    2: 6,   8: 10,
+    3: 5,   9: 9,
+    4: 4,   10: 8,
+    5: 3,   11: 7,
+    6: 2,   12: 12,
+});
+
+// prettier-ignore
+const D20_MAPPINGS: Readonly<{ [key: number]: number }> = Object.freeze({
+    1: 1,   11: 6,
+    2: 19,  12: 16,
+    3: 13,  13: 4,
+    4: 7,   14: 10,
+    5: 9,   15: 18,
+    6: 3,   16: 12,
+    7: 11,  17: 14,
+    8: 17,  18: 8,
+    9: 5,   19: 2,
+    10: 7,  20: 1,
+});
+
+// prettier-ignore
+const D100_MAPPINGS: Readonly<{ [key: number]: number }> = Object.freeze({
+    0: 0,   50: 50,
+    10: 20, 60: 70,
+    20: 60, 70: 10,
+    30: 80, 80: 30,
+    40: 40, 90: 90,
+});
+
 function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = false): FaceInfo[] {
     const pos = geometry.getAttribute('position');
     const uvs = new Float32Array(pos.count * 2);
@@ -384,8 +434,29 @@ function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = f
 
     sortedIndices.forEach((normalIndex, index) => {
         const normal = uniqueNormals[normalIndex];
-        const value = index * valueMultiplier + valueOffset;
+        let value = index * valueMultiplier + valueOffset;
+        switch (type) {
+            case DiceType.D6:
+                break;
+            case DiceType.D8:
+                value = D8_MAPPINGS[value] ?? value;
+                break;
+            case DiceType.D10:
+                value = D10_MAPPINGS[value] ?? value;
+                break;
+            case DiceType.D12:
+                value = D12_MAPPINGS[value] ?? value;
+                break;
+            case DiceType.D20:
+                value = D20_MAPPINGS[value] ?? value;
+                break;
+            case DiceType.D100:
+                value = D100_MAPPINGS[value] ?? value;
+                break;
+        }
         faces.push({ normal, value });
+        // Find the new index based on our updated value
+        index = (value - valueOffset) / valueMultiplier;
 
         const triangleIndices = normalGroups[normalIndex];
 
