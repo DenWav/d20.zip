@@ -151,13 +151,11 @@ export class AudioManager {
             } else {
                 dist = Math.abs(this.renderer.camera.position.lengthSq());
             }
-            const diff = Math.log(1 / (dist / DEFAULT_DISTANCE)); // initial divide inverted to prevent divide by 0
+            const diff = Math.log2(1 / (dist / DEFAULT_DISTANCE)); // initial divide inverted to prevent divide by 0
             if (diff > 1) {
-                console.log(Math.min(diff, 1.5));
                 volume *= Math.min(diff, 1.5);
             } else if (diff < -1) {
-                console.log(1 / Math.min(-diff, 10));
-                volume *= 1 / Math.min(-diff, 10);
+                volume /= -diff;
             }
 
             const gainNode = ctx.createGain();
