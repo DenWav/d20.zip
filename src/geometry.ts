@@ -1,4 +1,5 @@
 // MIT license: https://d20.zip/license.txt
+// https://github.com/DenWav/d20.zip
 
 import { THREE } from './vendor.js';
 import { GEOMETRY } from './constants.js';

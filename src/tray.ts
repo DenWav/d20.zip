@@ -1,3 +1,6 @@
+// MIT license: https://d20.zip/license.txt
+// https://github.com/DenWav/d20.zip
+
 import { RAPIER, THREE } from './vendor.js';
 import { COLLISION_GROUPS, MATERIALS, SCENE, TRAY } from './constants.js';
 import { createFeltTexture } from './dice.js';

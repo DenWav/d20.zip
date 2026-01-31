@@ -1,3 +1,6 @@
+// MIT license: https://d20.zip/license.txt
+// https://github.com/DenWav/d20.zip
+
 import { World } from './world.js';
 import { DiceBag } from './dice.js';
 import { UiManager } from './ui.js';

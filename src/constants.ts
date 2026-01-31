@@ -1,4 +1,5 @@
 // MIT license: https://d20.zip/license.txt
+// https://github.com/DenWav/d20.zip
 
 export const MAX_DICE = 256;
 
@@ -137,6 +138,13 @@ export const GEOMETRY = Object.freeze({
     D12_RADIUS: 0.8,
     D20_RADIUS: 0.9,
 });
+
+export interface DiceSoundConstant {
+    BASE_VOLUME: number;
+    BASE_FREQ: number;
+    DECAY: number;
+    MATERIAL: string;
+}
 
 export const SOUND = Object.freeze({
     ENABLED: true,

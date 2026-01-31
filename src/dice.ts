@@ -1,3 +1,6 @@
+// MIT license: https://d20.zip/license.txt
+// https://github.com/DenWav/d20.zip
+
 import { COLLISION_GROUPS, DICE, GEOMETRY, MATERIALS, MAX_DICE, TRAY } from './constants.js';
 import { RAPIER, THREE } from './vendor.js';
 import { getD4, getCube, getD8, getD10, getD12, getD20 } from './geometry.js';

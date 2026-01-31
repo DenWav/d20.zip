@@ -1,13 +1,14 @@
 // MIT license: https://d20.zip/license.txt
+// https://github.com/DenWav/d20.zip
 
-import { SOUND } from './constants.js';
+import { DiceSoundConstant, SOUND } from './constants.js';
 
 type CollisionType = 'dice-dice' | 'dice-floor' | 'dice-wall';
 
 export class AudioManager {
     private audioContext: AudioContext | null = null;
     private lastPlayTime = 0;
-    private enabled = SOUND.ENABLED;
+    private enabled: boolean = SOUND.ENABLED;
     private initialized = false;
     private buffers: Map<string, AudioBuffer> = new Map();
     private loading = false;
@@ -104,7 +105,7 @@ export class AudioManager {
 
         // Select appropriate buffer
         let bufferKey: string;
-        let config: typeof SOUND.DICE_DICE;
+        let config: DiceSoundConstant;
 
         if (type === 'dice-dice') {
             bufferKey = `dice-dice-${Math.random() < 0.5 ? 1 : 2}`;

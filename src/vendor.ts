@@ -1,4 +1,5 @@
 // MIT license: https://d20.zip/license.txt
+// https://github.com/DenWav/d20.zip
 
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';

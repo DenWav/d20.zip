@@ -1,3 +1,6 @@
+// MIT license: https://d20.zip/license.txt
+// https://github.com/DenWav/d20.zip
+
 import { THREE, OrbitControls } from './vendor.js';
 import { SCENE } from './constants.js';
 import { mulberry32 } from './util.js';

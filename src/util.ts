@@ -1,3 +1,6 @@
+// MIT license: https://d20.zip/license.txt
+// https://github.com/DenWav/d20.zip
+
 import { Stats } from './vendor.js';
 
 // --- Seeded Random for Deterministic Assets ---
