@@ -36,8 +36,7 @@ canvas {
     color: white;
     text-align: center;
     pointer-events: auto;
-    width: 100%;
-    max-width: var(--ui-width);
+    width: calc(min(var(--ui-width), 100% - 10px));
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -72,12 +71,30 @@ button::-moz-focus-inner {
 }
 
 .roll-container {
-    display: flex;
-    flex-direction: column;
-    align-content: start;
+    display: grid;
     width: 100%;
-    gap: var(--ui-gap);
+    grid-template:
+        'roll-1 roll-2 roll-3 roll-4' 1fr
+        'roll-5 roll-6 roll-7 roll-8' 1fr
+        'formula formula roll-control roll-control' 1fr
+        / 1fr 1fr 1fr 1fr;
+    grid-template-rows: repeat(3, 1fr);
+    grid-gap: var(--ui-gap);
+    place-content: center stretch;
     padding-bottom: 20px;
+}
+
+@media (max-width: 600px) {
+    .roll-container {
+        grid-template:
+            'roll-1 roll-2' 1fr
+            'roll-3 roll-4' 1fr
+            'roll-5 roll-6' 1fr
+            'roll-7 roll-8' 1fr
+            'formula formula' 1fr
+            'roll-control roll-control' 1fr
+            / 1fr 1fr;
+    }
 }
 
 .roll-row {
@@ -90,71 +107,46 @@ button::-moz-focus-inner {
 
 .roll-control {
     display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: var(--ui-gap);
-}
-
-.roll-control-buttons {
-    display: flex;
+    width: 100%;
     flex-direction: row;
     flex-wrap: nowrap;
     gap: var(--ui-gap);
 }
 
-.roll-control-buttons {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    gap: var(--ui-gap);
-}
-.roll-control-buttons .btn {
-    width: calc(((var(--ui-width) / 2) - (var(--ui-gap) / 2) - (var(--ui-gap) * 2)) / 3);
+.roll-control * {
+    width: unset;
+    padding: 0;
+    margin: 0;
 }
 
-@media (max-width: 600px) {
-    .roll-control-buttons {
-        width: 100%;
-    }
-    .roll-control-buttons .btn {
-        width: 33%;
-    }
+.roll-control > * {
+    flex: 1;
 }
 
 .dice-btn-group {
     display: flex;
+    place-self: center stretch;
     pointer-events: auto;
-    width: calc((var(--ui-width) - var(--ui-gap) * 3) / 4);
 }
 
-@media (max-width: 600px) {
-    .dice-btn-group {
-        width: calc(50% - var(--ui-gap));
-    }
-    .dice-btn-group .btn {
-        width: 90%;
-    }
+.dice-btn-group * {
+    width: unset;
 }
 
 .dice-btn-group .btn {
     margin: 0;
+    padding: 0;
 }
 
 .dice-btn-main {
     border-radius: 5px 0 0 5px !important;
-    min-width: 35px;
+    flex: 3;
 }
 
 .dice-btn-subs {
     display: flex;
+    flex: 2;
     flex-direction: column;
-    width: 55px;
-}
-
-@media (max-width: 600px) {
-    .dice-btn-subs {
-        width: 65%;
-    }
 }
 
 .sub-btn {
@@ -163,7 +155,6 @@ button::-moz-focus-inner {
     -moz-appearance: none;
     border: 1px solid rgba(255, 255, 255, 0.3);
     color: white;
-    padding: 2px 4px;
     cursor: pointer;
     font-size: 10px;
     border-left: none;
@@ -202,13 +193,6 @@ button::-moz-focus-inner {
 #formula-wrapper {
     display: flex;
     position: relative;
-    min-width: calc(var(--ui-width) / 2 - var(--ui-gap) / 2);
-}
-
-@media (max-width: 600px) {
-    #formula-wrapper {
-        width: calc(100%);
-    }
 }
 
 #formula {
