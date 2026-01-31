@@ -1,7 +1,7 @@
 // MIT license: https://d20.zip/license.txt
 // https://github.com/DenWav/d20.zip
 
-import { RAPIER } from './vendor.js';
+import { RAPIER, THREE } from './vendor.js';
 import { COLLISION_GROUPS, SOUND, TRAY } from './constants.js';
 import { DiceBag } from './dice.js';
 import { AudioManager } from './audio.js';
@@ -13,7 +13,7 @@ export class Physics {
     public audio!: AudioManager;
     public dice!: DiceBag;
 
-    // Store most recent collission pair time
+    // Store most recent collision pair time
     // Key: collision pair
     // Value: last time collision occurred
     private readonly recentCollisions = new Map<string, number>();
@@ -120,7 +120,16 @@ export class Physics {
             if (now - lastTime < SOUND.MIN_INTERVAL * 2) return; // Extra throttling per pair
 
             this.recentCollisions.set(key, now);
-            this.audio.play(collisionType, velocity);
+
+            let loc: THREE.Vector3 | null = null;
+            const contact = collider1.contactCollider(collider2, 1);
+            if (contact) {
+                const point1 = new THREE.Vector3(contact.point1.x, contact.point1.y, contact.point1.z);
+                const point2 = new THREE.Vector3(contact.point2.x, contact.point2.y, contact.point2.z);
+                loc = point1.add(point2.sub(point1).divideScalar(2));
+            }
+
+            this.audio.play(collisionType, velocity, loc);
         });
 
         // Clean up old collision records (older than 1 second)

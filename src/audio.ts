@@ -96,7 +96,7 @@ export class AudioManager {
         }
     }
 
-    public play(type: CollisionType, velocity: number) {
+    public play(type: CollisionType, velocity: number, loc: THREE.Vector3 | null) {
         if (!this.enabled || !this.initialized) return;
         if (velocity < SOUND.MIN_VELOCITY) return;
 
@@ -145,11 +145,18 @@ export class AudioManager {
             let volume = config.BASE_VOLUME * velocityVolume * this.volume;
 
             // Adjust volume based on camera distance
-            const dist = Math.abs(this.renderer.camera.position.lengthSq());
+            let dist: number;
+            if (loc) {
+                dist = Math.abs(loc.distanceToSquared(this.renderer.camera.position));
+            } else {
+                dist = Math.abs(this.renderer.camera.position.lengthSq());
+            }
             const diff = Math.log(1 / (dist / DEFAULT_DISTANCE)); // initial divide inverted to prevent divide by 0
             if (diff > 1) {
+                console.log(Math.min(diff, 1.5));
                 volume *= Math.min(diff, 1.5);
-            } else if (diff < 0) {
+            } else if (diff < -1) {
+                console.log(1 / Math.min(-diff, 10));
                 volume *= 1 / Math.min(-diff, 10);
             }
 
