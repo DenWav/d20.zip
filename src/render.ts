@@ -51,7 +51,7 @@ export class Renderer {
             SCENE.CAMERA.NEAR,
             SCENE.CAMERA.FAR
         );
-        camera.position.set(SCENE.CAMERA.INITIAL_POS.x, SCENE.CAMERA.INITIAL_POS.y, SCENE.CAMERA.INITIAL_POS.z);
+        camera.position.set(SCENE.CAMERA.INITIAL_POS.X, SCENE.CAMERA.INITIAL_POS.Y, SCENE.CAMERA.INITIAL_POS.Z);
         camera.lookAt(0, 0, 0);
 
         return camera;
@@ -67,17 +67,17 @@ export class Renderer {
     }
 
     private setupLighting(scene: THREE.Scene) {
-        const ambientLight = new THREE.AmbientLight(SCENE.LIGHTS.AMBIENT.color, SCENE.LIGHTS.AMBIENT.intensity);
+        const ambientLight = new THREE.AmbientLight(SCENE.LIGHTS.AMBIENT.COLOR, SCENE.LIGHTS.AMBIENT.INTENSITY);
         scene.add(ambientLight);
 
         const directionalLight = new THREE.DirectionalLight(
-            SCENE.LIGHTS.DIRECTIONAL.color,
-            SCENE.LIGHTS.DIRECTIONAL.intensity
+            SCENE.LIGHTS.DIRECTIONAL.COLOR,
+            SCENE.LIGHTS.DIRECTIONAL.INTENSITY
         );
         directionalLight.position.set(
-            SCENE.LIGHTS.DIRECTIONAL.position.x,
-            SCENE.LIGHTS.DIRECTIONAL.position.y,
-            SCENE.LIGHTS.DIRECTIONAL.position.z
+            SCENE.LIGHTS.DIRECTIONAL.POS.X,
+            SCENE.LIGHTS.DIRECTIONAL.POS.Y,
+            SCENE.LIGHTS.DIRECTIONAL.POS.Z
         );
         directionalLight.castShadow = true;
         directionalLight.shadow.camera.left = SCENE.LIGHTS.DIRECTIONAL.SHADOW.CAMERA.LEFT;
@@ -93,11 +93,11 @@ export class Renderer {
         scene.add(directionalLight);
 
         // Secondary light for more depth
-        const fillLight = new THREE.DirectionalLight(SCENE.LIGHTS.FILL.color, SCENE.LIGHTS.FILL.intensity);
+        const fillLight = new THREE.DirectionalLight(SCENE.LIGHTS.FILL.COLOR, SCENE.LIGHTS.FILL.INTENSITY);
         fillLight.position.set(
-            SCENE.LIGHTS.FILL.position.x,
-            SCENE.LIGHTS.FILL.position.y,
-            SCENE.LIGHTS.FILL.position.z
+            SCENE.LIGHTS.FILL.POSITION.X,
+            SCENE.LIGHTS.FILL.POSITION.Y,
+            SCENE.LIGHTS.FILL.POSITION.Z
         );
         scene.add(fillLight);
     }

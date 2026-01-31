@@ -6,7 +6,7 @@ import { AudioManager } from './audio.js';
 import * as Tray from './tray.js';
 import { Renderer } from './render.js';
 import { World } from './world.js';
-import { Dice, DiceBag, DiceType, DiceTypes, getDiceTypeFromSides, RollGroup } from './dice.js';
+import { Dice, DiceBag, DiceType, DiceTypes, getDiceTypeFromSides, RollGroup, RollRecord } from './dice.js';
 import { UiManager } from './ui.js';
 import { State } from './state.js';
 import { COLLISION_GROUPS, DICE, MAX_DICE, STATE_SAVE_INTERVAL, TRAY } from './constants.js';
@@ -48,16 +48,13 @@ const stats = initStats();
     }
 };
 
-(window as any).rollDice = (type?: DiceType) => {
-    const selectedType = type || DiceTypes[Math.floor(Math.random() * DiceTypes.length)];
-    (window as any).rollFormula(selectedType);
-};
-
 (window as any).clearDice = () => {
     for (const die of dice.diceList) {
-        world.physics.rapierWorld.removeRigidBody(die.body);
+        dice.removeDice(die);
+        dice.canceledRollId = die.rollId;
     }
     dice.diceList.length = 0;
+    dice.clearActiveRolls();
     dice.instanceManager.reset();
     state.saveState();
 };
@@ -66,7 +63,7 @@ const stats = initStats();
     dice.rollHistory.length = 0;
     dice.pruneDiceList();
     ui.updateHistoryUI();
-    state.saveState();
+    (window as any).clearDice();
 };
 
 (window as any).resetCamera = () => {
@@ -179,14 +176,25 @@ function blockEventPropagation(event: MouseEvent) {
     }
     ui.hideErrorMessage();
 
-    while (dice.diceList.length + totalPhysicalDice > MAX_DICE && dice.diceList.length > 0) {
-        const oldestRollId = dice.diceList[0].rollId;
-        while (dice.diceList.length > 0 && dice.diceList[0].rollId === oldestRollId) {
+    let removedDice = false;
+    while (dice.totalDiceCount + totalPhysicalDice > MAX_DICE) {
+        let roll = dice.popLastActiveRoll();
+        if (!roll) {
+            console.error('No active roll found');
+            break;
+        }
+        dice.canceledRollId = Math.max(roll.id, dice.canceledRollId ?? 0);
+        while (dice.diceList.length > 0 && dice.diceList[0].rollId === roll.id) {
             const die = dice.diceList.shift();
             if (die) {
-                world.physics.rapierWorld.removeRigidBody(die.body);
+                dice.removeDice(die);
+                removedDice = true;
             }
         }
+    }
+    if (removedDice) {
+        // We may have removed many dice, so always update
+        dice.instanceManager.update();
     }
 
     // 4. Prepare for spawning
@@ -217,7 +225,21 @@ function blockEventPropagation(event: MouseEvent) {
     const shuffledIndices = Array.from({ length: totalPhysicalDice }, (_, i) => i);
     shuffleArray(shuffledIndices);
 
-    // 5. Spawn dice
+    // 5. Add to history
+    const roll: RollRecord = {
+        id: rollId,
+        formula,
+        template,
+        result: null,
+        groups,
+        groupResults: [],
+        breakdown: null,
+    };
+
+    ui.addToHistory(roll);
+    dice.addActiveRoll(roll);
+
+    // 6. Schedule spawn dice
     spawnTasks.forEach((task, i) => {
         const delay = cumulativeDelay;
         cumulativeDelay += DICE.SPAWN_DELAY_BASE + Math.random() * DICE.SPAWN_DELAY_VAR;
@@ -235,9 +257,6 @@ function blockEventPropagation(event: MouseEvent) {
             delay
         );
     });
-
-    // 6. Add to history
-    ui.addToHistory(formula, template, rollId, groups);
 };
 
 const formulaInput = document.getElementById('formula') as HTMLInputElement;
@@ -297,7 +316,6 @@ function updateDiceResults() {
             }
 
             const damping = Math.pow(100, duration - 10);
-            console.log('Damping');
             die.body.setLinearDamping(damping);
             die.body.setAngularDamping(damping);
         }
@@ -457,6 +475,10 @@ function animate(time: number = 0) {
     // Process collision events for sound
     physics.processCollisions();
 
+    // Since dice spawn async, even though we try to prevent spawns for cancelled dice, they can still happen
+    // Prune any that make it through here
+    dice.filterActiveRolls();
+
     for (const die of dice.diceList) {
         if (!die.hasEnteredTray) {
             const pos = die.body.translation();
@@ -477,7 +499,7 @@ function animate(time: number = 0) {
     }
 
     // Update instanced mesh rendering
-    dice.instanceManager.update(dice.diceList, renderer.camera);
+    dice.instanceManager.update();
 
     updateDiceResults();
 

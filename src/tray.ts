@@ -35,9 +35,9 @@ export function initTray(world: World) {
     const physicsFloorThickness = TRAY.PHYSICS_FLOOR_THICKNESS;
     const floorDesc = RAPIER.RigidBodyDesc.fixed().setCcdEnabled(true).setTranslation(0, -physicsFloorThickness, 0);
     const floorBody = world.physics.rapierWorld.createRigidBody(floorDesc);
-    const floorColliderDesc = RAPIER.ColliderDesc.cuboid(floorRadius * 2, physicsFloorThickness, floorRadius * 2)
+    const floorColliderDesc = RAPIER.ColliderDesc.cuboid(floorRadius * 100, physicsFloorThickness, floorRadius * 100)
         .setFriction(0.9)
-        .setRestitution(0.1)
+        .setRestitution(0.2)
         .setCollisionGroups(COLLISION_GROUPS.GROUND | (COLLISION_GROUPS.DICE << 16))
         .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
     world.physics.rapierWorld.createCollider(floorColliderDesc, floorBody);

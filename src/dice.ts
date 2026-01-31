@@ -630,6 +630,8 @@ export class DiceInstanceManager {
 
     constructor(
         private scene: THREE.Scene,
+        private camera: THREE.Camera,
+        private dice: DiceBag,
         private material: THREE.Material
     ) {}
 
@@ -648,18 +650,18 @@ export class DiceInstanceManager {
         return imesh;
     }
 
-    update(diceList: Dice[], camera: THREE.Camera) {
-        camera.updateMatrixWorld();
+    update() {
+        this.camera.updateMatrixWorld();
         this.projScreenMatrix.multiplyMatrices(
-            camera.projectionMatrix,
-            camera.matrixWorldInverse.copy(camera.matrixWorld).invert()
+            this.camera.projectionMatrix,
+            this.camera.matrixWorldInverse.copy(this.camera.matrixWorld).invert()
         );
         this.frustum.setFromProjectionMatrix(this.projScreenMatrix);
 
         const counts = new Map<string, number>();
         this.instances.forEach((_, key) => counts.set(key, 0));
 
-        for (const dice of diceList) {
+        for (const dice of this.dice.diceList) {
             const key = `${dice.type}${dice.isTens ? '-tens' : ''}`;
             const imesh = this.getInstancedMesh(dice.type, !!dice.isTens);
             const index = counts.get(key) || 0;
@@ -716,15 +718,39 @@ export interface RollRecord {
 }
 
 export class DiceBag {
-    public nextRollId = 0;
-    public readonly diceList: Dice[] = [];
+    public nextRollId: number = 0;
+    public canceledRollId: number | null = null;
+
+    private _diceList: Dice[] = [];
     public readonly rollHistory: RollRecord[] = [];
+
+    private readonly activeRolls: RollRecord[] = [];
+    private readonly _activeRollIds: Set<number> = new Set();
 
     private readonly diceMaterial = createDiceMaterial();
     public readonly instanceManager: DiceInstanceManager;
 
     public constructor(private readonly world: World) {
-        this.instanceManager = new DiceInstanceManager(world.renderer.scene, this.diceMaterial);
+        this.instanceManager = new DiceInstanceManager(
+            world.renderer.scene,
+            world.renderer.camera,
+            this,
+            this.diceMaterial
+        );
+    }
+
+    public get diceList(): Dice[] {
+        return this._diceList;
+    }
+
+    public filterActiveRolls() {
+        this._diceList = this.diceList.filter((die) => {
+            if (this.isActiveRoll(die.rollId)) {
+                return true;
+            }
+            this.removeDice(die);
+            return false;
+        });
     }
 
     public createDice(
@@ -737,6 +763,14 @@ export class DiceBag {
         totalInRoll = 1,
         initialState?: any
     ) {
+        // Double check that we should spawn this dice
+        if (this.canceledRollId && rollId <= this.canceledRollId) {
+            return;
+        }
+        if (!this._activeRollIds.has(rollId)) {
+            return;
+        }
+
         const asset = getDiceAsset(type, isTens);
         const geometry = asset.geometry;
         const shape = asset.shape;
@@ -811,15 +845,10 @@ export class DiceBag {
             body.setTranslation(spawnPos, true);
             mesh.position.copy(spawnPos);
 
-            let quat: THREE.Quaternion;
-            if (type === DiceType.D2) {
-                // Coin starts flat (since we aligned the shape to Y axis)
-                quat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() * Math.PI * 2);
-            } else {
-                const axis = new THREE.Vector3(Math.random(), Math.random(), Math.random()).normalize();
-                const rotAngle = Math.random() * Math.PI * 2;
-                quat = new THREE.Quaternion().setFromAxisAngle(axis, rotAngle);
-            }
+            const axis = new THREE.Vector3(Math.random(), Math.random(), Math.random()).normalize();
+            const rotAngle = Math.random() * Math.PI * 2;
+            let quat = new THREE.Quaternion().setFromAxisAngle(axis, rotAngle);
+
             body.setRotation(quat, true);
             mesh.quaternion.copy(quat);
 
@@ -844,16 +873,16 @@ export class DiceBag {
             const speed = DICE.THROW.SPEED_BASE + Math.random() * DICE.THROW.SPEED_VAR;
             const velVec = horizontalDir.clone().multiplyScalar(speed);
 
-            // Slight upward arc for the throw
-            velVec.y = DICE.THROW.UPWARD_BASE + Math.random() * DICE.THROW.UPWARD_VAR;
-
             body.setLinvel(velVec, true);
 
+            function increaseMagnitude(v: number, increase: number) {
+                return v + Math.sign(v) * increase;
+            }
             // Ensure significant initial rotation (tumbling)
             const angVel = {
-                x: (Math.random() - 0.5) * DICE.FLIP.DEFAULT_ANGVEL,
-                y: (Math.random() - 0.5) * DICE.FLIP.DEFAULT_ANGVEL,
-                z: (Math.random() - 0.5) * DICE.FLIP.DEFAULT_ANGVEL,
+                x: increaseMagnitude((Math.random() - 0.5) * DICE.FLIP.MULT_ANGVEL, DICE.FLIP.BASE_ANGVEL),
+                y: increaseMagnitude((Math.random() - 0.5) * DICE.FLIP.MULT_ANGVEL, DICE.FLIP.BASE_ANGVEL),
+                z: increaseMagnitude((Math.random() - 0.5) * DICE.FLIP.MULT_ANGVEL, DICE.FLIP.BASE_ANGVEL),
             };
             body.setAngvel(angVel, true);
 
@@ -906,9 +935,50 @@ export class DiceBag {
         for (let i = this.diceList.length - 1; i >= 0; i--) {
             const dice = this.diceList[i];
             if (!historyIds.has(dice.rollId)) {
-                this.world.physics.rapierWorld.removeRigidBody(dice.body);
+                this.removeDice(dice);
                 this.diceList.splice(i, 1);
             }
         }
+        this.instanceManager.update();
+    }
+
+    public addActiveRoll(roll: RollRecord) {
+        this.activeRolls.push(roll);
+        this._activeRollIds.add(roll.id);
+    }
+
+    public popLastActiveRoll(): RollRecord | null {
+        const roll = this.activeRolls.shift() ?? null;
+        if (roll) {
+            this._activeRollIds.delete(roll.id);
+        }
+        return roll;
+    }
+
+    public clearActiveRolls() {
+        this.activeRolls.length = 0;
+        this._activeRollIds.clear();
+    }
+
+    public get activeRollIds(): number[] {
+        return this.activeRolls.map((r) => r.id);
+    }
+
+    public isActiveRoll(rollId: number): boolean {
+        return this._activeRollIds.has(rollId);
+    }
+
+    public removeDice(dice: Dice) {
+        this.world.physics.rapierWorld.removeRigidBody(dice.body);
+    }
+
+    public get totalDiceCount(): number {
+        let sum = 0;
+        for (const roll of this.activeRolls) {
+            for (const group of roll.groups) {
+                sum += group.count;
+            }
+        }
+        return sum;
     }
 }

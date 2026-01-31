@@ -43,16 +43,9 @@ export class UiManager {
         }
     }
 
-    public addToHistory(formula: string, template: string, id: number, groups: RollGroup[]) {
-        this.dice.rollHistory.unshift({
-            id,
-            formula,
-            template,
-            result: null,
-            groups,
-            groupResults: [],
-            breakdown: null,
-        });
+    public addToHistory(roll: RollRecord) {
+        this.dice.rollHistory.unshift(roll);
+
         if (this.dice.rollHistory.length > UI.MAX_HISTORY) {
             this.dice.rollHistory.pop();
         }

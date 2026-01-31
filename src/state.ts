@@ -47,6 +47,7 @@ export class State {
                     hasEnteredTray: d.hasEnteredTray,
                 };
             }),
+            activeRolls: this.dice.activeRollIds,
         };
         localStorage.setItem('d20_state', JSON.stringify(state));
     }
@@ -92,6 +93,16 @@ export class State {
                     }
                     if (audioVolumeValue) {
                         audioVolumeValue.textContent = `${state.audio.volume}%`;
+                    }
+                }
+            }
+            if (state.activeRolls) {
+                for (const id of state.activeRolls) {
+                    const roll = this.dice.rollHistory.find((r) => r.id === id);
+                    if (roll) {
+                        this.dice.addActiveRoll(roll);
+                    } else {
+                        console.log('MISSED');
                     }
                 }
             }

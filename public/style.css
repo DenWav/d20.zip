@@ -1,3 +1,15 @@
+:root {
+    --ui-width: 580px;
+    --ui-gap: 8px;
+}
+
+@media (max-width: 600px) {
+    :root {
+        --ui-width: 320px;
+        --ui-gap: 4px;
+    }
+}
+
 * {
     box-sizing: border-box;
 }
@@ -25,10 +37,15 @@ canvas {
     text-align: center;
     pointer-events: auto;
     width: 100%;
-    max-width: 600px;
+    max-width: var(--ui-width);
     display: flex;
     flex-direction: column;
     align-items: center;
+}
+
+button::-moz-focus-inner {
+    border: 0;
+    padding: 0;
 }
 
 .btn {
@@ -43,17 +60,137 @@ canvas {
     padding: 0 10px;
     border-radius: 5px;
     cursor: pointer;
-    margin: 2px;
     backdrop-filter: blur(5px);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
+    font-size: 16px;
 }
 
-button::-moz-focus-inner {
-    border: 0;
-    padding: 0;
+.btn:active {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.roll-container {
+    display: flex;
+    flex-direction: column;
+    align-content: start;
+    width: 100%;
+    gap: var(--ui-gap);
+    padding-bottom: 20px;
+}
+
+.roll-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--ui-gap);
+}
+
+.roll-control {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--ui-gap);
+}
+
+.roll-control-buttons {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: var(--ui-gap);
+}
+
+.roll-control-buttons {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: var(--ui-gap);
+}
+.roll-control-buttons .btn {
+    width: calc(((var(--ui-width) / 2) - (var(--ui-gap) / 2) - (var(--ui-gap) * 2)) / 3);
+}
+
+@media (max-width: 600px) {
+    .roll-control-buttons {
+        width: 100%;
+    }
+    .roll-control-buttons .btn {
+        width: 33%;
+    }
+}
+
+.dice-btn-group {
+    display: flex;
+    pointer-events: auto;
+    width: calc((var(--ui-width) - var(--ui-gap) * 3) / 4);
+}
+
+@media (max-width: 600px) {
+    .dice-btn-group {
+        width: calc(50% - var(--ui-gap));
+    }
+    .dice-btn-group .btn {
+        width: 90%;
+    }
+}
+
+.dice-btn-group .btn {
+    margin: 0;
+}
+
+.dice-btn-main {
+    border-radius: 5px 0 0 5px !important;
+    min-width: 35px;
+}
+
+.dice-btn-subs {
+    display: flex;
+    flex-direction: column;
+    width: 55px;
+}
+
+@media (max-width: 600px) {
+    .dice-btn-subs {
+        width: 65%;
+    }
+}
+
+.sub-btn {
+    background: rgba(0, 0, 0, 0.2) none;
+    appearance: none;
+    -moz-appearance: none;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 2px 4px;
+    cursor: pointer;
+    font-size: 10px;
+    border-left: none;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(5px);
+}
+
+@media (hover: hover) {
+    .sub-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+}
+
+.sub-btn:active {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.sub-btn.adv {
+    border-radius: 0 5px 0 0;
+}
+
+.sub-btn.dis {
+    border-radius: 0 0 5px 0;
+    border-top: none;
 }
 
 @media (hover: hover) {
@@ -62,15 +199,16 @@ button::-moz-focus-inner {
     }
 }
 
-.btn:active {
-    background: rgba(255, 255, 255, 0.3);
-}
-
 #formula-wrapper {
     display: flex;
-    flex: 1;
     position: relative;
-    margin: 2px;
+    min-width: calc(var(--ui-width) / 2 - var(--ui-gap) / 2);
+}
+
+@media (max-width: 600px) {
+    #formula-wrapper {
+        width: calc(100%);
+    }
 }
 
 #formula {
@@ -85,7 +223,6 @@ button::-moz-focus-inner {
     border-radius: 5px;
     outline: none;
     width: 100%;
-    min-width: 25%;
     font-size: 14px;
     backdrop-filter: blur(5px);
     pointer-events: auto;
@@ -462,80 +599,8 @@ button::-moz-focus-inner {
     background: rgba(255, 255, 255, 0.3);
 }
 
-.dice-button-row {
-    display: flex;
-    flex-direction: row;
-    flex-basis: fit-content;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    width: 100%;
-    margin-bottom: 5px;
-}
-
-.dice-button-row > .btn {
-    width: 100px;
-    white-space: nowrap;
-}
-
 .btn-danger {
     background: rgba(255, 50, 50, 0.3) !important;
-}
-
-.dice-btn-group {
-    display: flex;
-    margin: 2px;
-    pointer-events: auto;
-    width: calc(50% - 6px);
-}
-
-.dice-btn-group .btn {
-    margin: 0;
-}
-
-.dice-btn-main {
-    border-radius: 5px 0 0 5px !important;
-}
-
-.dice-btn-subs {
-    display: flex;
-    flex-direction: column;
-    width: 55px;
-}
-
-.sub-btn {
-    background: rgba(0, 0, 0, 0.2) none;
-    appearance: none;
-    -moz-appearance: none;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    color: white;
-    padding: 2px 4px;
-    cursor: pointer;
-    font-size: 10px;
-    border-left: none;
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    backdrop-filter: blur(5px);
-}
-
-@media (hover: hover) {
-    .sub-btn:hover {
-        background: rgba(255, 255, 255, 0.2);
-    }
-}
-
-.sub-btn:active {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-.sub-btn.adv {
-    border-radius: 0 5px 0 0;
-}
-
-.sub-btn.dis {
-    border-radius: 0 0 5px 0;
-    border-top: none;
 }
 
 #error-message {
