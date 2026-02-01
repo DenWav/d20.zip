@@ -479,8 +479,14 @@ function applyDiceUVs(geometry: THREE.BufferGeometry, type: DiceType, isTens = f
 
         // Consistent local coordinate system for the face
         let up = new THREE.Vector3(0, 1, 0);
-        if (Math.abs(normal.dot(up)) > 0.9) up.set(0, 0, 1);
+        if (Math.abs(normal.dot(up)) > 0.9) {
+            up.set(0, 0, 1);
+        }
         let tangent = new THREE.Vector3().crossVectors(up, normal).normalize();
+        if (type === DiceType.D8 && value % 2 === 0) {
+            // For D8, the even numbers need to be flipped around to line up with the equator
+            tangent.multiplyScalar(-1);
+        }
         let bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
 
         if (type === DiceType.D20) {
