@@ -16,7 +16,7 @@
 
 import { COLLISION_GROUPS, DICE, GEOMETRY, MATERIALS, MAX_DICE, TRAY } from './constants.js';
 import { RAPIER, THREE } from './vendor.js';
-import { getD4, getCube, getD8, getD10, getD12, getD20 } from './geometry.js';
+import { getD4, getCube, getD8, getD10, getD12, getD20, getD2 } from './geometry.js';
 import { mulberry32 } from './util.js';
 import { World } from './world.js';
 
@@ -635,6 +635,8 @@ function getDiceAsset(type: DiceType, isTens: boolean): CachedDiceAsset {
     let geometry: THREE.BufferGeometry;
     switch (type) {
         case DiceType.D2:
+            geometry = getD2();
+            break;
         case DiceType.D4:
             geometry = getD4();
             break;

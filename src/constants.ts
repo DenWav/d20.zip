@@ -86,6 +86,7 @@ export const DICE = Object.freeze({
     FRICTION: 0.3,
     DENSITY: 1.0,
     SLEEP_THRESHOLD: 0.00001,
+    SLEEP_ITERATIONS: 20,
     SPAWN: Object.freeze({
         HEIGHT_BASE: 8.0,
         HEIGHT_VAR: 4.0,

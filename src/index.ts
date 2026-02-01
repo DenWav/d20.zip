@@ -299,12 +299,17 @@ window.addEventListener('resize', () => {
 
 let lastTime = 0;
 
+const slowDice = new WeakMap<Dice, number>();
+
 function updateDiceResults() {
     const rollsToUpdate = new Set<number>();
 
     const now = new Date().getTime();
 
     for (const die of dice.diceList) {
+        // Objects will go to sleep on their own eventually, but they have to be stationary for a couple seconds.
+        // This code tries to intelligently help the dice go to sleep quicker, without locking the dice while they are
+        // still active.
         block: if (!die.body.isSleeping()) {
             const linvel = die.body.linvel();
             const angvel = die.body.angvel();
@@ -312,12 +317,23 @@ function updateDiceResults() {
                 return vec.x * vec.x + vec.y * vec.y + vec.z * vec.z;
             }
             if (die.hasEnteredTray && sq(linvel) < DICE.SLEEP_THRESHOLD && sq(angvel) < DICE.SLEEP_THRESHOLD) {
-                die.body.sleep();
+                // The die needs to be considered sleepable for `DICE.SLEEP_ITERATIONS` before we actually mark it.
+                // This does have the downside that it takes longer on slower browser, e.g., 30fps vs. 60pfs vs. 120fps.
+                // But even at 30fps as long as `DICE.SLEEP_ITERATIONS` is kept to a reasonable value that will be less
+                // than a second to decide a die is sleepable.
+                const slowVal = slowDice.get(die);
+                if (slowVal && slowVal > DICE.SLEEP_ITERATIONS) {
+                    die.body.sleep();
+                    slowDice.delete(die);
+                } else if (slowVal) {
+                    slowDice.set(die, slowVal + 1);
+                } else {
+                    slowDice.set(die, 1);
+                }
                 break block;
             }
 
-            // Proactively sleep dice to prevent jitter
-            // D2 (coins) jitter violently, so they have a higher threshold
+            // Proactively slow dice down after a threshold to prevent jitter
             if (!die.awakeSince) {
                 die.awakeSince = new Date();
                 continue;
@@ -332,6 +348,8 @@ function updateDiceResults() {
             const damping = Math.pow(100, duration - 10);
             die.body.setLinearDamping(damping);
             die.body.setAngularDamping(damping);
+        } else {
+            slowDice.delete(die);
         }
 
         if (die.body.isSleeping()) {
@@ -489,7 +507,7 @@ function animate(time: number = 0) {
     // Process collision events for sound
     physics.processCollisions();
 
-    // Since dice spawn async, even though we try to prevent spawns for cancelled dice, they can still happen
+    // Since dice spawn async, even though we try to prevent spawns for canceled dice, they can still happen
     // Prune any that make it through here
     dice.filterActiveRolls();
 
