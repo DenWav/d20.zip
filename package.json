@@ -3,6 +3,7 @@
     "version": "1.0.0",
     "description": "",
     "main": "dist/index.js",
+    "license": "AGPL-3.0-only",
     "//": "I'm not a web developer, I know this copy nonsense is silly, but I don't know the right way to do it.",
     "scripts": {
         "clean": "rimraf dist",
