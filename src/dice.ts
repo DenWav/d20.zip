@@ -271,7 +271,7 @@ const D20_MAPPINGS: Readonly<{ [key: number]: number }> = Object.freeze({
     7: 11,  17: 14,
     8: 17,  18: 8,
     9: 5,   19: 2,
-    10: 7,  20: 1,
+    10: 7,  20: 20,
 });
 
 // prettier-ignore
